@@ -131,12 +131,10 @@
 		],
 		"parameters": {
 			"databaseSchema": {
-				"type": "string",
-				"defaultValue": "SalesLT"
+				"type": "string"
 			},
 			"dataSourceID": {
-				"type": "string",
-				"defaultValue": "01_100"
+				"type": "string"
 			},
 			"dateAndTimeOfImport": {
 				"type": "string"
