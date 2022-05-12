@@ -12,7 +12,14 @@
 						"referenceName": "P01 - Data Ingestion",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"dateAndTimeOfImport": {
+							"value": "@pipeline().TriggerTime",
+							"type": "Expression"
+						},
+						"dataSourceID": "01_100"
+					}
 				}
 			}
 		],

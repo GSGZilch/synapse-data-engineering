@@ -28,15 +28,15 @@
 						"referenceName": "ds_sqldb_generic",
 						"type": "DatasetReference",
 						"parameters": {
-							"tableName": "dummy",
-							"databaseSchema": "SalesLT"
+							"tableName": "placeholder",
+							"databaseSchema": "placeholder"
 						}
 					},
 					"firstRowOnly": false
 				}
 			},
 			{
-				"name": "ForEach1",
+				"name": "Ingest Data for Each Table",
 				"type": "ForEach",
 				"dependsOn": [
 					{
@@ -54,7 +54,7 @@
 					},
 					"activities": [
 						{
-							"name": "Ingest SQL Source to Bronze_copy1",
+							"name": "Ingest SQL Source to Bronze",
 							"type": "Copy",
 							"dependsOn": [],
 							"policy": {
@@ -111,7 +111,17 @@
 							"outputs": [
 								{
 									"referenceName": "ds_adls_synw_csv",
-									"type": "DatasetReference"
+									"type": "DatasetReference",
+									"parameters": {
+										"folderPath": {
+											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+											"type": "Expression"
+										},
+										"filePath": {
+											"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
+											"type": "Expression"
+										}
+									}
 								}
 							]
 						}
@@ -123,6 +133,13 @@
 			"databaseSchema": {
 				"type": "string",
 				"defaultValue": "SalesLT"
+			},
+			"dataSourceID": {
+				"type": "string",
+				"defaultValue": "01_100"
+			},
+			"dateAndTimeOfImport": {
+				"type": "string"
 			}
 		},
 		"variables": {
