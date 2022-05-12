@@ -1,0 +1,239 @@
+{
+	"name": "transform_rentals",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "spark03",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "38d71fe6-13fd-4766-b907-b55fbafe08b7"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/e2dfd859-bf21-4372-81d0-02afa53724d0/resourceGroups/rg-mdw778t05/providers/Microsoft.Synapse/workspaces/syn-mdw778t05-dev/bigDataPools/spark03",
+				"name": "spark03",
+				"type": "Spark",
+				"endpoint": "https://syn-mdw778t05-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/spark03",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 10,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"microsoft": {
+						"language": "python"
+					},
+					"collapsed": false
+				},
+				"source": [
+					"%%pyspark\r\n",
+					"\r\n",
+					"from pyspark.sql.functions import lit, concat, to_timestamp\r\n",
+					"from pyspark.sql.types import *\r\n",
+					"\r\n",
+					"def add_columns(source_id, df):\r\n",
+					"    df = df.withColumn(\"SourceID\", lit(source_id))\r\n",
+					"    df = df.withColumn(\"UniqueTransactionID\", concat(df.SourceID, df.TransactionID))\r\n",
+					"    df = df.withColumn(\"UniqueMovieID\",concat(df.SourceID, df.MovieID))\r\n",
+					"    df = df.withColumn(\"UniqueCustomerID\", concat(df.SourceID, df.CustomerID))\r\n",
+					"    return df\r\n",
+					"\r\n",
+					"schema = StructType([ \\\r\n",
+					"    StructField(\"TransactionID\", StringType(), True), \\\r\n",
+					"    StructField(\"CustomerID\", StringType(), True), \\\r\n",
+					"    StructField(\"MovieID\", StringType(), True), \\\r\n",
+					"    StructField(\"RentalDate\", StringType(), True), \\\r\n",
+					"    StructField(\"ReturnDate\", StringType(), True), \\\r\n",
+					"    StructField(\"RentalCost\", StringType(), True), \\\r\n",
+					"    StructField(\"LateFee\", StringType(), True), \\\r\n",
+					"    StructField(\"RewindFlag\", StringType(), True), \\\r\n",
+					"    StructField(\"CreatedDate\", StringType(), True), \\\r\n",
+					"    StructField(\"UpdatedDate\", StringType(), True)])\r\n",
+					"\r\n",
+					"df_f = spark.read.load(\r\n",
+					"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Transactions.csv', \r\n",
+					"    format='csv', schema=schema)\r\n",
+					"\r\n",
+					"df_v = spark.read.load(\r\n",
+					"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Transactions-085610.csv', \r\n",
+					"    format='csv', sep=';', header=True)\r\n",
+					"\r\n",
+					"df_f = add_columns(3, df_f)\r\n",
+					"df_v = add_columns(2, df_v)"
+				],
+				"execution_count": 42
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_f.limit(5))"
+				],
+				"execution_count": 43
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_v.limit(5))"
+				],
+				"execution_count": 44
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"df_rentals =  df_f.union(df_v)"
+				],
+				"execution_count": 45
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"df_v.count() + df_f.count() == df_rentals.count()"
+				],
+				"execution_count": 46
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"df_rentals = df_rentals.withColumn(\"RentalDate\", to_timestamp(df_rentals.RentalDate, \"yyyyMMdd\"))\r\n",
+					"df_rentals = df_rentals.withColumn(\"ReturnDate\", to_timestamp(df_rentals.ReturnDate, \"yyyyMMdd\"))\r\n",
+					"df_rentals = df_rentals.withColumn(\"CreatedDate\", to_timestamp(df_rentals.CreatedDate))\r\n",
+					"df_rentals = df_rentals.withColumn(\"UpdatedDate\", to_timestamp(df_rentals.UpdatedDate))\r\n",
+					"df_rentals = df_rentals.withColumn(\"LateFee\", df_rentals.LateFee.cast(FloatType()))\r\n",
+					"df_rentals = df_rentals.withColumn(\"RentalCost\", df_rentals.RentalCost.cast(FloatType()))\r\n",
+					"df_rentals = df_rentals.withColumn(\"SourceID\", df_rentals.SourceID.cast(IntegerType()))\r\n",
+					"\r\n",
+					"\r\n",
+					"display(df_rentals.limit(5))"
+				],
+				"execution_count": 47
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql import SparkSession \r\n",
+					"from pyspark.sql.types import *\r\n",
+					"from datetime import datetime\r\n",
+					"   \r\n",
+					"account_name = 'dlsmdw778t05dev'\r\n",
+					"container_name = 'dls' \r\n",
+					"relative_path = 'silver/'\r\n",
+					"\r\n",
+					"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+					"print('Primary storage account path: ' + adls_path) \r\n",
+					"\r\n",
+					"df_rentals = df_rentals.repartition(1)\r\n",
+					"\r\n",
+					"dt = datetime.now()\r\n",
+					"\r\n",
+					"filepath = f\"{adls_path}rentals/\" \r\n",
+					"\r\n",
+					"df_rentals.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+					"df_rentals.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+					"df_rentals.write.json(f\"{filepath}json/\", mode='overwrite')"
+				],
+				"execution_count": 48
+			}
+		]
+	}
+}

@@ -1,0 +1,213 @@
+{
+	"name": "transform_fourthcoffee_transactions",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "spark03",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "f4e85bb7-649c-4d3b-903a-7dcb1838201f"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/e2dfd859-bf21-4372-81d0-02afa53724d0/resourceGroups/rg-mdw778t05/providers/Microsoft.Synapse/workspaces/syn-mdw778t05-dev/bigDataPools/spark03",
+				"name": "spark03",
+				"type": "Spark",
+				"endpoint": "https://syn-mdw778t05-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/spark03",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 10,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
+					"from pyspark.sql.functions import *\r\n",
+					"from pyspark.sql.types import *"
+				],
+				"execution_count": 15
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"microsoft": {
+						"language": "python"
+					}
+				},
+				"source": [
+					"%%pyspark\r\n",
+					"\r\n",
+					"def read_dataframe(filename):\r\n",
+					"    df = spark.read.load(\r\n",
+					"        f'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/transactions/{filename}.csv', \r\n",
+					"        format='csv', sep=',')\r\n",
+					"    return df\r\n",
+					"\r\n",
+					"\r\n",
+					"def append_dataframes(dataframes_list):\r\n",
+					"    df = dataframes_list[0]\r\n",
+					"    for next_df in dataframes[1:]:\r\n",
+					"        df = df.union(next_df)\r\n",
+					"    return df\r\n",
+					"\r\n",
+					"\r\n",
+					"# CREATE LIST OF FILENAMES\r\n",
+					"filenames = [f\"2018-{month:02d}-{i:02d}\" for month in [1,3] for i in range(1, 32)]\r\n",
+					"filenames += [f\"2018-02-{i:02d}\" for i in range(1, 29)]\r\n",
+					"filenames += [f\"2018-04-{i:02d}\" for i in range(1, 11)]\r\n",
+					"\r\n",
+					"# CONVERT LIST OF FILENAMES TO LIST OF DATAFRAMES\r\n",
+					"dataframes = [read_dataframe(filename) for filename in filenames]\r\n",
+					"\r\n",
+					"# --> Example of Python List Comprehension\r\n",
+					"#dataframes = []\r\n",
+					"#for filename in filenames:\r\n",
+					"#    dataframes.append(read_dataframe(filename))\r\n",
+					"\r\n",
+					"# create function to union all dataframes in list\r\n",
+					"df = append_dataframes(dataframes)\r\n",
+					"\r\n",
+					"test_count = 0\r\n",
+					"for dataframe in dataframes:\r\n",
+					"    test_count += dataframe.count()\r\n",
+					"\r\n",
+					"df.count() == test_count\r\n",
+					"\r\n",
+					"df = df.select(\r\n",
+					"    df._c0.alias('TransactionID'),\r\n",
+					"    df._c1.alias('CustomerID'),\r\n",
+					"    df._c2.alias('MovieID'),\r\n",
+					"    df._c3.alias('RentalDate'),\r\n",
+					"    df._c4.alias('ReturnDate'),\r\n",
+					"    df._c5.alias('RentalCost'),\r\n",
+					"    df._c6.alias('LateFee'),\r\n",
+					"    df._c7.alias('RewindFlag'),\r\n",
+					"    df._c8.alias('CreatedDate'),\r\n",
+					"    df._c9.alias('UpdatedDate'))\r\n",
+					"\r\n",
+					"# convert to date\r\n",
+					"df = df.withColumn(\"RentalDate\", to_date(df.RentalDate, \"yyyyMMdd\"))\r\n",
+					"df = df.withColumn(\"ReturnDate\", to_date(df.ReturnDate, \"yyyyMMdd\"))\r\n",
+					"df = df.withColumn(\"CreatedDate\", to_date(df.ReturnDate, \"yyyy-MM-dd\"))\r\n",
+					"df = df.withColumn(\"UpdatedDate\", to_date(df.ReturnDate, \"yyyy-MM-dd\"))\r\n",
+					"\r\n",
+					"df = df.withColumn(\"RentalCost\", df.RentalCost.cast(FloatType()))\r\n",
+					"df = df.withColumn(\"LateFee\", df.LateFee.cast(FloatType()))\r\n",
+					"df = df.withColumn(\"RewindFlag\", df.RewindFlag.cast(BooleanType()))"
+				],
+				"execution_count": 20
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df.limit(10))"
+				],
+				"execution_count": 21
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"df.printSchema()"
+				],
+				"execution_count": 22
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql import SparkSession \r\n",
+					"   \r\n",
+					"account_name = 'dlsmdw778t05dev'\r\n",
+					"container_name = 'dls' \r\n",
+					"relative_path = 'silver/'\r\n",
+					"\r\n",
+					"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+					"print('Primary storage account path: ' + adls_path) \r\n",
+					"\r\n",
+					"df = df.repartition(1)\r\n",
+					"\r\n",
+					"filepath = f\"{adls_path}fourthcoffee_transactions/\" \r\n",
+					"\r\n",
+					"df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+					"df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+					"df.write.json(f\"{filepath}json/\", mode='overwrite')"
+				],
+				"execution_count": 24
+			}
+		]
+	}
+}

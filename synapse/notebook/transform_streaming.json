@@ -1,0 +1,177 @@
+{
+	"name": "transform_streaming",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "spark04",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "d75909fe-907c-4eed-a4e4-05492e3263a5"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/e2dfd859-bf21-4372-81d0-02afa53724d0/resourceGroups/rg-mdw778t05/providers/Microsoft.Synapse/workspaces/syn-mdw778t05-dev/bigDataPools/spark04",
+				"name": "spark04",
+				"type": "Spark",
+				"endpoint": "https://syn-mdw778t05-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/spark04",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 10,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"tags": [
+						"parameters"
+					]
+				},
+				"source": [
+					"year = \"*\"\r\n",
+					"month = \"*\"\r\n",
+					"day = \"*\""
+				],
+				"execution_count": 1
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"microsoft": {
+						"language": "python"
+					},
+					"tags": []
+				},
+				"source": [
+					"%%pyspark\r\n",
+					"from pyspark.sql.functions import concat\r\n",
+					"\r\n",
+					"uri= f'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudstreaming/{year}/{month}/{day}/Transactions-*.csv'\r\n",
+					"df_streaming = spark.read.load(uri, format='csv', sep=';', header=True)\r\n",
+					""
+				],
+				"execution_count": 2
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import lit, concat, to_timestamp\r\n",
+					"df_streaming = df_streaming.withColumn(\"SourceID\",lit(1))\r\n",
+					"df_streaming = df_streaming.withColumn(\"UniqueOrderID\", concat(df_streaming.SourceID, df_streaming.TransactionID))\r\n",
+					"df_streaming = df_streaming.withColumn(\"UniqueMovieID\",concat(df_streaming.SourceID, df_streaming.MovieID))\r\n",
+					"df_streaming = df_streaming.withColumn(\"UniqueCustomerID\", concat(df_streaming.SourceID, df_streaming.CustomerID))\r\n",
+					"df_streaming = df_streaming.withColumn(\"StreamStart\", to_timestamp(df_streaming.StreamStart))\r\n",
+					"df_streaming = df_streaming.withColumn(\"StreamEnd\", to_timestamp(df_streaming.StreamEnd))\r\n",
+					"df_streaming = df_streaming.withColumn(\"CreatedDate\", to_timestamp(df_streaming.CreatedDate))\r\n",
+					"df_streaming = df_streaming.withColumn(\"UpdatedDate\", to_timestamp(df_streaming.UpdatedDate))"
+				],
+				"execution_count": 3
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_streaming.limit(5))\r\n",
+					""
+				],
+				"execution_count": 4
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql import SparkSession \r\n",
+					"from pyspark.sql.types import *\r\n",
+					"from datetime import datetime\r\n",
+					"   \r\n",
+					"account_name = 'dlsmdw778t05dev'\r\n",
+					"container_name = 'dls' \r\n",
+					"relative_path = 'silver/'\r\n",
+					"\r\n",
+					"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+					"print('Primary storage account path: ' + adls_path) \r\n",
+					"\r\n",
+					"df_streaming = df_streaming.repartition(1)\r\n",
+					"\r\n",
+					"dt = datetime.now()\r\n",
+					"\r\n",
+					"filepath = f\"{adls_path}streaming/\" \r\n",
+					"\r\n",
+					"df_streaming.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+					"df_streaming.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+					"df_streaming.write.json(f\"{filepath}json/\", mode='overwrite')"
+				],
+				"execution_count": 5
+			}
+		]
+	}
+}

@@ -1,0 +1,676 @@
+{
+	"name": "transform_catalog_data",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "spark06",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "56g",
+			"driverCores": 8,
+			"executorMemory": "56g",
+			"executorCores": 8,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "47bcfa29-bf1c-4492-9867-3e5b173ab82b"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/e2dfd859-bf21-4372-81d0-02afa53724d0/resourceGroups/rg-mdw778t05/providers/Microsoft.Synapse/workspaces/syn-mdw778t05-dev/bigDataPools/spark06",
+				"name": "spark06",
+				"type": "Spark",
+				"endpoint": "https://syn-mdw778t05-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/spark06",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.2",
+				"nodeCount": 3,
+				"cores": 8,
+				"memory": 56,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Imports"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"collapsed": false
+				},
+				"source": [
+					"##Import SQL \r\n",
+					"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
+					"from pyspark.sql.functions import explode\r\n",
+					"from pyspark.sql.functions import *\r\n",
+					"from pyspark.sql.types import *"
+				],
+				"execution_count": 1
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					""
+				]
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Functions"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"def buildStorageUri(account_name, container_name):\r\n",
+					"  return  f\"abfss://{container_name}@{account_name}.dfs.core.windows.net\"  \r\n",
+					"\r\n",
+					"def readDataframe(filepath, filetype, schema):    \r\n",
+					" df = spark.read.format(filetype)\\\r\n",
+					" .option('header', 'false')\\\r\n",
+					" .schema(schema)\\\r\n",
+					" .load(filepath)\r\n",
+					"     \r\n",
+					" df.printSchema()\r\n",
+					" df.show()\r\n",
+					"\r\n",
+					" return df \r\n",
+					"\r\n",
+					"def writeDataframe(df, filePath, partitions):\r\n",
+					"    \r\n",
+					"    df = df.repartition(partitions)\r\n",
+					"    \r\n",
+					"    dt = datetime.now()\r\n",
+					"\r\n",
+					"    #df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+					"    #df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+					"    #df.write.json(f\"{filepath}json/\", mode='overwrite')\r\n",
+					"\r\n",
+					"    return df.count()\r\n",
+					"\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"Genre\", StringType(), True),\\\r\n",
+					"    StructField(\"Rating\", StringType(), True),\\\r\n",
+					"    StructField(\"Length\", StringType(), True),\\\r\n",
+					"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+					"    ]) \r\n",
+					"\r\n",
+					"account_name = 'dlsmdw778t05dev'\r\n",
+					"container_name = 'dls' \r\n",
+					"zone_name = 'bronze'\r\n",
+					"\r\n",
+					"uri = buildStorageUri(account_name, container_name)\r\n",
+					"inputfilepath = f\"{uri}/{zone_name}/fourthcoffee/rentals/Movies.csv\"\r\n",
+					"\r\n",
+					"\r\n",
+					"df_movies = readDataframe(inputfilepath, \"csv\", schema)\r\n",
+					"\r\n",
+					"display(df_movies.limit(5))\r\n",
+					"  \r\n",
+					"outputpartitions = 1\r\n",
+					"outputfilepath = f\"{uri}/{zone_name}/catalog_data/\"\r\n",
+					"\r\n",
+					"#writeDataframe(df, outputfilepath, outputpartitions)\r\n",
+					""
+				],
+				"execution_count": 12
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Fourth Coffee"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"\r\n",
+					"\r\n",
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Movies.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"Genre\", StringType(), True),\\\r\n",
+					"    StructField(\"Rating\", StringType(), True),\\\r\n",
+					"    StructField(\"Length\", StringType(), True),\\\r\n",
+					"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_movie = spark.read.format('csv')\\\r\n",
+					".option('header', 'false')\\\r\n",
+					".schema(schema)\\\r\n",
+					".load(PATH)"
+				],
+				"execution_count": 64
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/MovieActors.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"PK\", StringType(), True),\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"ActorID\", StringType(), True)\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_movieactors = spark.read.format('csv')\\\r\n",
+					".option('header', 'false')\\\r\n",
+					".schema(schema)\\\r\n",
+					".load(PATH)"
+				],
+				"execution_count": 65
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Actors.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"ActorID\", StringType(), True),\\\r\n",
+					"    StructField(\"Name\", StringType(), True),\\\r\n",
+					"    StructField(\"Gender\", StringType(), True)\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_actors = spark.read.format('csv')\\\r\n",
+					".option('header', 'false')\\\r\n",
+					".schema(schema)\\\r\n",
+					".load(PATH)"
+				],
+				"execution_count": 66
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"df_4c = df_movieactors.join(df_movie, df_movieactors.MovieID == df_movie.MovieID, \"leftouter\").join(df_actors, df_movieactors.ActorID == df_actors.ActorID, \"leftouter\")\r\n",
+					"df_4c = df_4c.drop(df_movieactors.MovieID).drop(df_actors.ActorID)\r\n",
+					"df_4c = df_4c.withColumn(\"SourceID\", lit(3))\r\n",
+					"df_4c = df_4c.withColumn(\"MovieTier\", lit(None).cast(StringType()))\r\n",
+					"\r\n",
+					"df_4c = df_4c.withColumn(\"ReleaseDate\", to_timestamp(df_4c.ReleaseDate, \"MM-dd-yyyy\"))\r\n",
+					"\r\n",
+					"df_4c = df_4c.select(\r\n",
+					"    df_4c.SourceID,\r\n",
+					"    df_4c.ActorID,\r\n",
+					"    df_4c.Name.alias('Actor'),\r\n",
+					"    df_4c.Genre.alias('Genre'),\r\n",
+					"    df_4c.Rating.alias('Rating'),\r\n",
+					"    year(df_4c.ReleaseDate).alias('AvailabilityYear'),\r\n",
+					"    df_4c.ReleaseDate.alias('AvailabilityDate'),\r\n",
+					"    df_4c.MovieTier,\r\n",
+					"    df_4c.Title.alias('MovieTitle'),\r\n",
+					"    df_4c.MovieID) \r\n",
+					"\r\n",
+					"#display(df_4c.limit(5))"
+				],
+				"execution_count": 67
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Southridge"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"PATH = 'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/movies/2022/05/11/movies-082917.json'\r\n",
+					"\r\n",
+					"df_catalog = spark.read.format('json')\\\r\n",
+					".load(PATH)\r\n",
+					"\r\n",
+					"df_catalog = df_catalog.withColumn(\"ActorID\", lit(None).cast(StringType())).withColumn(\"MovieID\", lit(None).cast(StringType())).withColumn(\"SourceID\", lit(1))\r\n",
+					"\r\n",
+					"df_catalog = df_catalog.withColumn(\"streamingAvailabilityDate\", to_timestamp(df_catalog.streamingAvailabilityDate))\r\n",
+					"df_catalog = df_catalog.withColumn(\"tier\", df_catalog.tier.cast(StringType()))\r\n",
+					"df_catalog = df_catalog.withColumn(\"releaseYear\", df_catalog.releaseYear.cast(IntegerType()))\r\n",
+					"\r\n",
+					"df_catalog = df_catalog.select(\r\n",
+					"    df_catalog.SourceID,\r\n",
+					"    df_catalog.ActorID,\r\n",
+					"    explode(df_catalog.actors).alias('Actor'),\r\n",
+					"    df_catalog.genre.alias('Genre'),\r\n",
+					"    df_catalog.rating.alias('Rating'),\r\n",
+					"    df_catalog.releaseYear.alias('AvailabilityYear'),\r\n",
+					"    df_catalog.streamingAvailabilityDate.alias('AvailabilityDate'),\r\n",
+					"    df_catalog.tier.alias('MovieTier'),\r\n",
+					"    df_catalog.title.alias('MovieTitle'),\r\n",
+					"    df_catalog.MovieID)\r\n",
+					"\r\n",
+					"import pyspark.sql.functions as f\r\n",
+					"df_catalog = df_catalog.withColumn(\"Actor\", df_catalog.Actor.cast(StringType())).withColumn(\"Actor\", f.regexp_replace(f.col(\"Actor\"), \"[\\{}]\", \"\"))\r\n",
+					"\r\n",
+					"#df_catalog.printSchema()\r\n",
+					"#df_catalog.show()\r\n",
+					"display(df_catalog.limit(5))"
+				],
+				"execution_count": 83
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Vanardsdel"
+				]
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					""
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#load \r\n",
+					"\r\n",
+					"\r\n",
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Movies-085610.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"Genre\", StringType(), True),\\\r\n",
+					"    StructField(\"Rating\", StringType(), True),\\\r\n",
+					"    StructField(\"Length\", StringType(), True),\\\r\n",
+					"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_va_movie = spark.read.format('csv')\\\r\n",
+					".option('header', 'false')\\\r\n",
+					".option('sep', ';')\\\r\n",
+					".schema(schema)\\\r\n",
+					".load(PATH)\r\n",
+					"\r\n",
+					"#df_va_movie.printSchema()\r\n",
+					"#df_va_movie.show()"
+				],
+				"execution_count": 69
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Actors"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#load \r\n",
+					"\r\n",
+					"\r\n",
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Actors-085610.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"Genre\", StringType(), True),\\\r\n",
+					"    StructField(\"Rating\", StringType(), True),\\\r\n",
+					"    StructField(\"Length\", StringType(), True),\\\r\n",
+					"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_va_actors = spark.read.format('csv')\\\r\n",
+					".option('header', 'true')\\\r\n",
+					".option('sep', ';')\\\r\n",
+					".load(PATH)\r\n",
+					"\r\n",
+					"#df_va_actors.printSchema()\r\n",
+					"#df_va_actors.show()"
+				],
+				"execution_count": 70
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## MovieActors"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#load \r\n",
+					"\r\n",
+					"\r\n",
+					"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/MovieActors-085610.csv')\r\n",
+					"\r\n",
+					"schema = StructType([\\\r\n",
+					"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"Genre\", StringType(), True),\\\r\n",
+					"    StructField(\"Rating\", StringType(), True),\\\r\n",
+					"    StructField(\"Length\", StringType(), True),\\\r\n",
+					"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+					"    ])\r\n",
+					"\r\n",
+					"df_va_movieactors = spark.read.format('csv')\\\r\n",
+					".option('header', 'true')\\\r\n",
+					".option('sep', ';')\\\r\n",
+					".load(PATH)\r\n",
+					"\r\n",
+					"#df_va_movieactors.printSchema()\r\n",
+					"#df_va_movieactors.show()"
+				],
+				"execution_count": 71
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"# JOIN\r\n",
+					"df_va_catalog = df_va_movieactors.join(df_va_movie, df_va_movieactors.MovieID == df_va_movie.MovieID, \"leftouter\").join(df_va_actors, df_va_movieactors.ActorID == df_va_actors.ActorID, \"leftouter\")\r\n",
+					"df_va_catalog = df_va_catalog.drop(df_va_movieactors.MovieID).drop(df_va_movieactors.ActorID)\r\n",
+					"df_va_catalog = df_va_catalog.withColumn(\"SourceID\", lit(2)).withColumn(\"MovieTier\", lit(None).cast(StringType()))\r\n",
+					"\r\n",
+					"df_va_catalog = df_va_catalog.withColumn(\"ReleaseDate\", to_timestamp(df_va_catalog.ReleaseDate, \"MM-dd-yyyy\"))\r\n",
+					"\r\n",
+					"df_va_catalog = df_va_catalog.select(\r\n",
+					"    df_va_catalog.SourceID,\r\n",
+					"    df_va_catalog.ActorID,\r\n",
+					"    df_va_catalog.ActorName.alias('Actor'),\r\n",
+					"    df_va_catalog.Genre,\r\n",
+					"    df_va_catalog.Rating,\r\n",
+					"    year(df_va_catalog.ReleaseDate).alias('AvailabilityYear'),\r\n",
+					"    df_va_catalog.ReleaseDate.alias('AvailabilityDate'),\r\n",
+					"    df_va_catalog.MovieTier,\r\n",
+					"    df_va_catalog.Title.alias('MovieTitle'),\r\n",
+					"    df_va_catalog.MovieID)\r\n",
+					"\r\n",
+					"#display(df_va_catalog.limit(5))"
+				],
+				"execution_count": 72
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# UNION ALL DATASETS"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"df_catalog.printSchema()\r\n",
+					"df_4c.printSchema()\r\n",
+					"df_va_catalog.printSchema()"
+				],
+				"execution_count": 84
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#TODO UNION ALL\r\n",
+					"final_df = df_catalog.union(df_4c).union(df_va_catalog)\r\n",
+					"final_df.count() == df_catalog.count() + df_4c.count() + df_va_catalog.count() "
+				],
+				"execution_count": 85
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql import SparkSession \r\n",
+					"from pyspark.sql.types import *\r\n",
+					"from datetime import datetime\r\n",
+					"   \r\n",
+					"account_name = 'dlsmdw778t05dev'\r\n",
+					"container_name = 'dls' \r\n",
+					"relative_path = 'silver/'\r\n",
+					"\r\n",
+					"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+					"print('Primary storage account path: ' + adls_path) \r\n",
+					"\r\n",
+					"final_df = final_df.repartition(1)\r\n",
+					"\r\n",
+					"dt = datetime.now()\r\n",
+					"\r\n",
+					"filepath = f\"{adls_path}catalog_data/\" \r\n",
+					"\r\n",
+					"final_df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+					"final_df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+					"final_df.write.json(f\"{filepath}json/\", mode='overwrite')"
+				],
+				"execution_count": 86
+			}
+		]
+	}
+}
