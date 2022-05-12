@@ -1,0 +1,21 @@
+{
+	"name": "PL - Main",
+	"properties": {
+		"activities": [
+			{
+				"name": "P01 - Data Ingestion",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "P01 - Data Ingestion",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"annotations": []
+	}
+}

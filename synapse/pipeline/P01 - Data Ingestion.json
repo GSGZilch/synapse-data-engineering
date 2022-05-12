@@ -1,0 +1,32 @@
+{
+	"name": "P01 - Data Ingestion",
+	"properties": {
+		"activities": [
+			{
+				"name": "PL - Ingest SQL Source to Bronze",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL - Ingest SQL Source to Bronze",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"databaseSchema": "SalesLT"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"dateAndTimeOfImport": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "_LoadEntity"
+		},
+		"annotations": []
+	}
+}
