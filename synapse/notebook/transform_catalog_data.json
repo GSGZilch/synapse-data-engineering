@@ -1,6 +1,9 @@
 {
 	"name": "transform_catalog_data",
 	"properties": {
+		"folder": {
+			"name": "openhack_mdw"
+		},
 		"nbformat": 4,
 		"nbformat_minor": 2,
 		"bigDataPool": {
@@ -17,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "47bcfa29-bf1c-4492-9867-3e5b173ab82b"
+				"spark.autotune.trackingId": "90c30752-690d-4259-922e-e7cb97389b98"
 			}
 		},
 		"metadata": {
@@ -33,17 +36,10 @@
 			"a365ComputeOptions": {
 				"id": "/subscriptions/e2dfd859-bf21-4372-81d0-02afa53724d0/resourceGroups/rg-mdw778t05/providers/Microsoft.Synapse/workspaces/syn-mdw778t05-dev/bigDataPools/spark06",
 				"name": "spark06",
-				"type": "Spark",
-				"endpoint": "https://syn-mdw778t05-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/spark06",
 				"auth": {
 					"type": "AAD",
 					"authResource": "https://dev.azuresynapse.net"
-				},
-				"sparkVersion": "3.2",
-				"nodeCount": 3,
-				"cores": 8,
-				"memory": 56,
-				"automaticScaleJobs": false
+				}
 			},
 			"sessionKeepAliveTimeout": 30
 		},
