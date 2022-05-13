@@ -2,7 +2,7 @@
 	"name": "transform_fourthcoffee_transactions",
 	"properties": {
 		"folder": {
-			"name": "legacy"
+			"name": "openhack_notebooks"
 		},
 		"nbformat": 4,
 		"nbformat_minor": 2,
