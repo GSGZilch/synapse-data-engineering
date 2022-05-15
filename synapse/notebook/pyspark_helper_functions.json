@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "43772aa7-ee97-4dd5-96d2-73b5c2037521"
+				"spark.autotune.trackingId": "e181cbac-7a96-48b1-82a6-f72c66c90d63"
 			}
 		},
 		"metadata": {
@@ -83,8 +83,7 @@
 					}
 				},
 				"source": [
-					"def write_dataframe(df, path, partitions, csv=True, parquet=False, json=False)\r\n",
-					"    \r\n",
+					"def write_dataframe(df, path, partitions, csv=True, parquet=False, json=False):\r\n",
 					"    df = df.repartition(partitions)\r\n",
 					"\r\n",
 					"    if csv: df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
