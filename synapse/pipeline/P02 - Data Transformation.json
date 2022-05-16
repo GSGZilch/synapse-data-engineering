@@ -1,15 +1,15 @@
 {
-	"name": "P01 - Data Ingestion",
+	"name": "P02 - Data Transformation",
 	"properties": {
 		"activities": [
 			{
-				"name": "10_100 - SalesLT - Ingest SQL Source to Bronze",
+				"name": "10_100 - SalesLT - Transform Customer Data",
 				"type": "ExecutePipeline",
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
-						"referenceName": "PL - Ingest SQL Source to Bronze",
+						"referenceName": "PL - Transform Customer Data",
 						"type": "PipelineReference"
 					},
 					"waitOnCompletion": true,
