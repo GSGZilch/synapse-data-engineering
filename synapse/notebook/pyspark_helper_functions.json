@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "74282b23-bbd8-4bbc-a173-cff6052a733d"
+				"spark.autotune.trackingId": "fa88994a-634f-432c-a079-4294d7645c01"
 			}
 		},
 		"metadata": {
@@ -48,7 +48,8 @@
 				"source": [
 					"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
 					"from pyspark.sql.functions import *\r\n",
-					"from pyspark.sql.types import *"
+					"from pyspark.sql.types import *\r\n",
+					"from datetime import datetime"
 				],
 				"execution_count": null
 			},
@@ -90,6 +91,29 @@
 					"    if csv: df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
 					"    if parquet: df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
 					"    if json: df.write.json(f\"{filepath}json/\", mode='overwrite')"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"def extract_datetime_attributes(dt: str):\r\n",
+					"    # Convert to datetime object\r\n",
+					"    dt = datetime.strptime(dt, \"%Y-%m-%d %H:%M:%S\")\r\n",
+					"\r\n",
+					"    # Extract year, month and day from pipeline trigger time\r\n",
+					"    return (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)"
 				],
 				"execution_count": null
 			}
