@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "beadaf62-1f5c-4afb-8e63-21493226c48d"
+				"spark.autotune.trackingId": "692321e1-a547-4864-a752-c3890df39b0a"
 			}
 		},
 		"metadata": {
@@ -262,6 +262,7 @@
 					"        database_schema=database_schema,\r\n",
 					"        entity=entity,\r\n",
 					"        dt=pipeline_trigger_time,\r\n",
+					"        add_file_name=True,\r\n",
 					"        extension=\"csv\"\r\n",
 					"    )\r\n",
 					"\r\n",
