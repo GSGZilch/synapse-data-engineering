@@ -2,7 +2,7 @@
 	"name": "transform_dvd_sales",
 	"properties": {
 		"folder": {
-			"name": "openhack_mdw"
+			"name": "legacy_openhack_mdw"
 		},
 		"nbformat": 4,
 		"nbformat_minor": 2,
@@ -45,8 +45,7 @@
 				"sparkVersion": "3.1",
 				"nodeCount": 10,
 				"cores": 4,
-				"memory": 28,
-				"automaticScaleJobs": false
+				"memory": 28
 			},
 			"sessionKeepAliveTimeout": 30
 		},

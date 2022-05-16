@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "61cb7dfd-3457-4aee-9ba2-acb88c6d2531"
+				"spark.autotune.trackingId": "c3e896e2-d683-4d86-9833-612cadc07e19"
 			}
 		},
 		"metadata": {
@@ -134,7 +134,7 @@
 					"def get_folder_path(tier, data_source_id, database_schema, entity, dt, extension=None):\r\n",
 					"    year, month, day, hour, minute, second = extract_datetime_attributes(dt)\r\n",
 					"    path = f\"abfss://data-platform@omweuadls001.dfs.core.windows.net/\"\r\n",
-					"    path += f\"{tier}/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}/\"\r\n",
+					"    path += f\"{tier}/{data_source_id}/{database_schema}/{entity}/{year}/{month:02d}/{day:02d}/\"\r\n",
 					"    path += f\"{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}\"\r\n",
 					"    if extension is not None: path += f\".{extension}\"\r\n",
 					"    return path"
