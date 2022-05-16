@@ -1,0 +1,2953 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "om-weu-syn-001"
+		},
+		"ls_sqldb_datasource001_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'ls_sqldb_datasource001'"
+		},
+		"om-weu-syn-001-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'om-weu-syn-001-WorkspaceDefaultSqlServer'"
+		},
+		"ls_adls_synw_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://omweuadls001.dfs.core.windows.net"
+		},
+		"om-weu-syn-001-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://omweuadls001.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/P01 - Data Ingestion')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "PL - Ingest SQL Source to Bronze",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL - Ingest SQL Source to Bronze",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"databaseSchema": "SalesLT",
+								"dataSourceID": {
+									"value": "@pipeline().parameters.dataSourceID",
+									"type": "Expression"
+								},
+								"dateAndTimeOfImport": {
+									"value": "@pipeline().parameters.dateAndTimeOfImport",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"dateAndTimeOfImport": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "_LoadEntity"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/PL - Ingest SQL Source to Bronze')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/PL - Ingest SQL Source to Bronze')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get SQL Table Names",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT [name] as tableName, SCHEMA_NAME(schema_id) FROM sys.tables\nWHERE SCHEMA_NAME(schema_id) = '@{pipeline().parameters.databaseSchema}'\nORDER BY 1 DESC;",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "ds_sqldb_generic",
+								"type": "DatasetReference",
+								"parameters": {
+									"tableName": "placeholder",
+									"databaseSchema": "placeholder"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Ingest Data for Each Table",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get SQL Table Names",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get SQL Table Names').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Ingest SQL Source to Bronze",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_sqldb_generic",
+											"type": "DatasetReference",
+											"parameters": {
+												"tableName": {
+													"value": "@item().tableName",
+													"type": "Expression"
+												},
+												"databaseSchema": {
+													"value": "@pipeline().parameters.databaseSchema",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_adls_synw_csv",
+											"type": "DatasetReference",
+											"parameters": {
+												"folderPath": {
+													"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+													"type": "Expression"
+												},
+												"filePath": {
+													"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"databaseSchema": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					},
+					"dateAndTimeOfImport": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"queryText": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "P01 - Data Ingestion"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/ds_sqldb_generic')]",
+				"[concat(variables('workspaceId'), '/datasets/ds_adls_synw_csv')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/PL - Main')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "P01 - Data Ingestion",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "P01 - Data Ingestion",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"dateAndTimeOfImport": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"dataSourceID": "01_100"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/P01 - Data Ingestion')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ds_adls_synw_csv')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_synw",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"folderPath": {
+						"type": "string"
+					},
+					"filePath": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "bronze/@{dataset().folderPath}",
+							"type": "Expression"
+						},
+						"fileSystem": "data-platform"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/ls_adls_synw')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ds_sqldb_generic')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_sqldb_datasource001",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"tableName": {
+						"type": "string"
+					},
+					"databaseSchema": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().databaseSchema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().tableName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/ls_sqldb_datasource001')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ls_adls_synw')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_synw_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ls_sqldb_datasource001')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('ls_sqldb_datasource001_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/om-weu-syn-001-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('om-weu-syn-001-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/om-weu-syn-001-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('om-weu-syn-001-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/pyspark_helper_functions')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "utils"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "899bbce4-1644-4816-9fba-bf76c4f62416"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
+							"from pyspark.sql.functions import *\r\n",
+							"from pyspark.sql.types import *"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {},
+						"source": [
+							"def read_dataframe(file_path, file_type, header=None, schema=None, verbose=False):    \r\n",
+							"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
+							"    df = spark.read.format(file_type)\r\n",
+							"    if header is not None: df = df.option('header', header)\r\n",
+							"    if schema is not None: df = df.schema(schema)\\\r\n",
+							"    df = df.load(file_path)\r\n",
+							"\r\n",
+							"    if verbose:\r\n",
+							"        df.printSchema()\r\n",
+							"        df.show()\r\n",
+							"\r\n",
+							"    return df"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"def write_dataframe(df, path, partitions, csv=True, parquet=False, json=False):\r\n",
+							"    df = df.repartition(partitions)\r\n",
+							"\r\n",
+							"    if csv: df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"    if parquet: df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"    if json: df.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_catalog_data')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "facb9f47-f776-4a3d-9f8e-785b58b11f77"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Imports"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"collapsed": false
+						},
+						"source": [
+							"##Import SQL \r\n",
+							"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
+							"from pyspark.sql.functions import explode\r\n",
+							"from pyspark.sql.functions import *\r\n",
+							"from pyspark.sql.types import *"
+						],
+						"outputs": [],
+						"execution_count": 1
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							""
+						]
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Functions"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"def buildStorageUri(account_name, container_name):\r\n",
+							"  return  f\"abfss://{container_name}@{account_name}.dfs.core.windows.net\"  \r\n",
+							"\r\n",
+							"def readDataframe(filepath, filetype, schema):    \r\n",
+							" df = spark.read.format(filetype)\\\r\n",
+							" .option('header', 'false')\\\r\n",
+							" .schema(schema)\\\r\n",
+							" .load(filepath)\r\n",
+							"     \r\n",
+							" df.printSchema()\r\n",
+							" df.show()\r\n",
+							"\r\n",
+							" return df \r\n",
+							"\r\n",
+							"def writeDataframe(df, filePath, partitions):\r\n",
+							"    \r\n",
+							"    df = df.repartition(partitions)\r\n",
+							"    \r\n",
+							"    dt = datetime.now()\r\n",
+							"\r\n",
+							"    #df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"    #df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"    #df.write.json(f\"{filepath}json/\", mode='overwrite')\r\n",
+							"\r\n",
+							"    return df.count()\r\n",
+							"\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"Genre\", StringType(), True),\\\r\n",
+							"    StructField(\"Rating\", StringType(), True),\\\r\n",
+							"    StructField(\"Length\", StringType(), True),\\\r\n",
+							"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+							"    ]) \r\n",
+							"\r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"zone_name = 'bronze'\r\n",
+							"\r\n",
+							"uri = buildStorageUri(account_name, container_name)\r\n",
+							"inputfilepath = f\"{uri}/{zone_name}/fourthcoffee/rentals/Movies.csv\"\r\n",
+							"\r\n",
+							"\r\n",
+							"df_movies = readDataframe(inputfilepath, \"csv\", schema)\r\n",
+							"\r\n",
+							"display(df_movies.limit(5))\r\n",
+							"  \r\n",
+							"outputpartitions = 1\r\n",
+							"outputfilepath = f\"{uri}/{zone_name}/catalog_data/\"\r\n",
+							"\r\n",
+							"#writeDataframe(df, outputfilepath, outputpartitions)\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 12
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Fourth Coffee"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"\r\n",
+							"\r\n",
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Movies.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"Genre\", StringType(), True),\\\r\n",
+							"    StructField(\"Rating\", StringType(), True),\\\r\n",
+							"    StructField(\"Length\", StringType(), True),\\\r\n",
+							"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_movie = spark.read.format('csv')\\\r\n",
+							".option('header', 'false')\\\r\n",
+							".schema(schema)\\\r\n",
+							".load(PATH)"
+						],
+						"outputs": [],
+						"execution_count": 64
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/MovieActors.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"PK\", StringType(), True),\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"ActorID\", StringType(), True)\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_movieactors = spark.read.format('csv')\\\r\n",
+							".option('header', 'false')\\\r\n",
+							".schema(schema)\\\r\n",
+							".load(PATH)"
+						],
+						"outputs": [],
+						"execution_count": 65
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Actors.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"ActorID\", StringType(), True),\\\r\n",
+							"    StructField(\"Name\", StringType(), True),\\\r\n",
+							"    StructField(\"Gender\", StringType(), True)\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_actors = spark.read.format('csv')\\\r\n",
+							".option('header', 'false')\\\r\n",
+							".schema(schema)\\\r\n",
+							".load(PATH)"
+						],
+						"outputs": [],
+						"execution_count": 66
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"df_4c = df_movieactors.join(df_movie, df_movieactors.MovieID == df_movie.MovieID, \"leftouter\").join(df_actors, df_movieactors.ActorID == df_actors.ActorID, \"leftouter\")\r\n",
+							"df_4c = df_4c.drop(df_movieactors.MovieID).drop(df_actors.ActorID)\r\n",
+							"df_4c = df_4c.withColumn(\"SourceID\", lit(3))\r\n",
+							"df_4c = df_4c.withColumn(\"MovieTier\", lit(None).cast(StringType()))\r\n",
+							"\r\n",
+							"df_4c = df_4c.withColumn(\"ReleaseDate\", to_timestamp(df_4c.ReleaseDate, \"MM-dd-yyyy\"))\r\n",
+							"\r\n",
+							"df_4c = df_4c.select(\r\n",
+							"    df_4c.SourceID,\r\n",
+							"    df_4c.ActorID,\r\n",
+							"    df_4c.Name.alias('Actor'),\r\n",
+							"    df_4c.Genre.alias('Genre'),\r\n",
+							"    df_4c.Rating.alias('Rating'),\r\n",
+							"    year(df_4c.ReleaseDate).alias('AvailabilityYear'),\r\n",
+							"    df_4c.ReleaseDate.alias('AvailabilityDate'),\r\n",
+							"    df_4c.MovieTier,\r\n",
+							"    df_4c.Title.alias('MovieTitle'),\r\n",
+							"    df_4c.MovieID) \r\n",
+							"\r\n",
+							"#display(df_4c.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 67
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Southridge"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"PATH = 'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/movies/2022/05/11/movies-082917.json'\r\n",
+							"\r\n",
+							"df_catalog = spark.read.format('json')\\\r\n",
+							".load(PATH)\r\n",
+							"\r\n",
+							"df_catalog = df_catalog.withColumn(\"ActorID\", lit(None).cast(StringType())).withColumn(\"MovieID\", lit(None).cast(StringType())).withColumn(\"SourceID\", lit(1))\r\n",
+							"\r\n",
+							"df_catalog = df_catalog.withColumn(\"streamingAvailabilityDate\", to_timestamp(df_catalog.streamingAvailabilityDate))\r\n",
+							"df_catalog = df_catalog.withColumn(\"tier\", df_catalog.tier.cast(StringType()))\r\n",
+							"df_catalog = df_catalog.withColumn(\"releaseYear\", df_catalog.releaseYear.cast(IntegerType()))\r\n",
+							"\r\n",
+							"df_catalog = df_catalog.select(\r\n",
+							"    df_catalog.SourceID,\r\n",
+							"    df_catalog.ActorID,\r\n",
+							"    explode(df_catalog.actors).alias('Actor'),\r\n",
+							"    df_catalog.genre.alias('Genre'),\r\n",
+							"    df_catalog.rating.alias('Rating'),\r\n",
+							"    df_catalog.releaseYear.alias('AvailabilityYear'),\r\n",
+							"    df_catalog.streamingAvailabilityDate.alias('AvailabilityDate'),\r\n",
+							"    df_catalog.tier.alias('MovieTier'),\r\n",
+							"    df_catalog.title.alias('MovieTitle'),\r\n",
+							"    df_catalog.MovieID)\r\n",
+							"\r\n",
+							"import pyspark.sql.functions as f\r\n",
+							"df_catalog = df_catalog.withColumn(\"Actor\", df_catalog.Actor.cast(StringType())).withColumn(\"Actor\", f.regexp_replace(f.col(\"Actor\"), \"[\\{}]\", \"\"))\r\n",
+							"\r\n",
+							"#df_catalog.printSchema()\r\n",
+							"#df_catalog.show()\r\n",
+							"display(df_catalog.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 83
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Vanardsdel"
+						]
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							""
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#load \r\n",
+							"\r\n",
+							"\r\n",
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Movies-085610.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"Genre\", StringType(), True),\\\r\n",
+							"    StructField(\"Rating\", StringType(), True),\\\r\n",
+							"    StructField(\"Length\", StringType(), True),\\\r\n",
+							"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_va_movie = spark.read.format('csv')\\\r\n",
+							".option('header', 'false')\\\r\n",
+							".option('sep', ';')\\\r\n",
+							".schema(schema)\\\r\n",
+							".load(PATH)\r\n",
+							"\r\n",
+							"#df_va_movie.printSchema()\r\n",
+							"#df_va_movie.show()"
+						],
+						"outputs": [],
+						"execution_count": 69
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Actors"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#load \r\n",
+							"\r\n",
+							"\r\n",
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Actors-085610.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"Genre\", StringType(), True),\\\r\n",
+							"    StructField(\"Rating\", StringType(), True),\\\r\n",
+							"    StructField(\"Length\", StringType(), True),\\\r\n",
+							"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_va_actors = spark.read.format('csv')\\\r\n",
+							".option('header', 'true')\\\r\n",
+							".option('sep', ';')\\\r\n",
+							".load(PATH)\r\n",
+							"\r\n",
+							"#df_va_actors.printSchema()\r\n",
+							"#df_va_actors.show()"
+						],
+						"outputs": [],
+						"execution_count": 70
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## MovieActors"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#load \r\n",
+							"\r\n",
+							"\r\n",
+							"PATH = ('abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/MovieActors-085610.csv')\r\n",
+							"\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"MovieID\", StringType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"Genre\", StringType(), True),\\\r\n",
+							"    StructField(\"Rating\", StringType(), True),\\\r\n",
+							"    StructField(\"Length\", StringType(), True),\\\r\n",
+							"    StructField(\"ReleaseDate\", StringType(), True),\\\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df_va_movieactors = spark.read.format('csv')\\\r\n",
+							".option('header', 'true')\\\r\n",
+							".option('sep', ';')\\\r\n",
+							".load(PATH)\r\n",
+							"\r\n",
+							"#df_va_movieactors.printSchema()\r\n",
+							"#df_va_movieactors.show()"
+						],
+						"outputs": [],
+						"execution_count": 71
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"# JOIN\r\n",
+							"df_va_catalog = df_va_movieactors.join(df_va_movie, df_va_movieactors.MovieID == df_va_movie.MovieID, \"leftouter\").join(df_va_actors, df_va_movieactors.ActorID == df_va_actors.ActorID, \"leftouter\")\r\n",
+							"df_va_catalog = df_va_catalog.drop(df_va_movieactors.MovieID).drop(df_va_movieactors.ActorID)\r\n",
+							"df_va_catalog = df_va_catalog.withColumn(\"SourceID\", lit(2)).withColumn(\"MovieTier\", lit(None).cast(StringType()))\r\n",
+							"\r\n",
+							"df_va_catalog = df_va_catalog.withColumn(\"ReleaseDate\", to_timestamp(df_va_catalog.ReleaseDate, \"MM-dd-yyyy\"))\r\n",
+							"\r\n",
+							"df_va_catalog = df_va_catalog.select(\r\n",
+							"    df_va_catalog.SourceID,\r\n",
+							"    df_va_catalog.ActorID,\r\n",
+							"    df_va_catalog.ActorName.alias('Actor'),\r\n",
+							"    df_va_catalog.Genre,\r\n",
+							"    df_va_catalog.Rating,\r\n",
+							"    year(df_va_catalog.ReleaseDate).alias('AvailabilityYear'),\r\n",
+							"    df_va_catalog.ReleaseDate.alias('AvailabilityDate'),\r\n",
+							"    df_va_catalog.MovieTier,\r\n",
+							"    df_va_catalog.Title.alias('MovieTitle'),\r\n",
+							"    df_va_catalog.MovieID)\r\n",
+							"\r\n",
+							"#display(df_va_catalog.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 72
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# UNION ALL DATASETS"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df_catalog.printSchema()\r\n",
+							"df_4c.printSchema()\r\n",
+							"df_va_catalog.printSchema()"
+						],
+						"outputs": [],
+						"execution_count": 84
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#TODO UNION ALL\r\n",
+							"final_df = df_catalog.union(df_4c).union(df_va_catalog)\r\n",
+							"final_df.count() == df_catalog.count() + df_4c.count() + df_va_catalog.count() "
+						],
+						"outputs": [],
+						"execution_count": 85
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql import SparkSession \r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime\r\n",
+							"   \r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"\r\n",
+							"final_df = final_df.repartition(1)\r\n",
+							"\r\n",
+							"dt = datetime.now()\r\n",
+							"\r\n",
+							"filepath = f\"{adls_path}catalog_data/\" \r\n",
+							"\r\n",
+							"final_df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"final_df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"final_df.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": 86
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_customer_data')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "3d0bca37-4edc-49bc-9123-119d6fcec679"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"print('Spark started.')"
+						],
+						"outputs": [],
+						"execution_count": 2
+					},
+					{
+						"cell_type": "code",
+						"metadata": {},
+						"source": [
+							"%run utils/pyspark_helper_functions"
+						],
+						"outputs": [],
+						"execution_count": 3
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df = read_dataframe('abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/Customer_20220512-024629.csv')"
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_customers')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "65108ea5-ca34-4367-8018-52838a28b4ce"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"## FOURTH COFFEE RAW DATA ##\r\n",
+							"df_fc = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Customers.csv', \r\n",
+							"    format='csv', sep=',')\r\n",
+							"\r\n",
+							"display(df_fc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 34
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## IMPORTS ##\r\n",
+							"from pyspark.sql.functions import concat,col\r\n",
+							"import pyspark.sql.functions as f\r\n",
+							"from pyspark.sql.functions import *\r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from pyspark.sql.functions import lit"
+						],
+						"outputs": [],
+						"execution_count": 35
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"collapsed": false
+						},
+						"source": [
+							"########################\r\n",
+							"## CUSTOMER DATAFRAME ##\r\n",
+							"########################\r\n",
+							"\r\n",
+							"#Set Filepath for FourthCoffee data\r\n",
+							"PATH = 'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Customers.csv'"
+						],
+						"outputs": [],
+						"execution_count": 36
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Create Schema for Fourth Coffee Customer DF\r\n",
+							"schema = StructType([\\\r\n",
+							"    StructField(\"CustomerID\", StringType(), True),\\\r\n",
+							"    StructField(\"FirstName\", StringType(), True),\\\r\n",
+							"    StructField(\"LastName\", StringType(), True),\\\r\n",
+							"    StructField(\"AddressLine1\", StringType(), True),\\\r\n",
+							"    StructField(\"AddressLine2\", StringType(), True),\\\r\n",
+							"    StructField(\"City\", StringType(), True),\\\r\n",
+							"    StructField(\"State\", StringType(), True),\\\r\n",
+							"    StructField(\"ZipCode\", StringType(), True),\\\r\n",
+							"    StructField(\"PhoneNumber\", StringType(), True),\\\r\n",
+							"    StructField(\"CreatedDate\", DateType(), True),\\\r\n",
+							"    StructField(\"UpdatedDate\", DateType(), True)])\r\n",
+							"\r\n",
+							"df_fc = spark.read.format(\"csv\")\\\r\n",
+							".option(\"header\", \"false\")\\\r\n",
+							".schema(schema)\\\r\n",
+							".load(PATH)\r\n",
+							"\r\n",
+							"display(df_fc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 37
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Create VanArsdel Customer DF\r\n",
+							"\r\n",
+							"df_vc = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Customers-082917.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"\r\n",
+							"display(df_vc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 38
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Create Southridge Customer DF\r\n",
+							"\r\n",
+							"df_sc = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudsales/2022/05/11/Customers-082917.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"\r\n",
+							"display(df_sc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 39
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add SourceID Column to Fourth Coffee Customer DF\r\n",
+							"\r\n",
+							"df_fc = df_fc.withColumn(\"SourceID\", lit(3))\r\n",
+							"display(df_fc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 40
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add SourceID Column to VanArsdel Customer DF\r\n",
+							"\r\n",
+							"df_vc = df_vc.withColumn(\"SourceID\", lit(2))\r\n",
+							"display(df_vc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 41
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add SourceID Column to Southridge Customer DF\r\n",
+							"\r\n",
+							"df_sc = df_sc.withColumn(\"SourceID\", lit(1))\r\n",
+							"display(df_sc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 42
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add UniqueID Column to Fourth Coffee Customer DF\r\n",
+							"\r\n",
+							"df_fc = df_fc.withColumn('UniqueID', f.concat_ws('_', df_fc.SourceID, df_fc.CustomerID))"
+						],
+						"outputs": [],
+						"execution_count": 43
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Add UniqueID Column to VanArsdel Customer DF\r\n",
+							"\r\n",
+							"df_vc = df_vc.withColumn('UniqueID', f.concat_ws('_', df_vc.SourceID, df_vc.CustomerID))"
+						],
+						"outputs": [],
+						"execution_count": 44
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add UniqueID Column to Southridge Customer DF\r\n",
+							"\r\n",
+							"df_sc = df_sc.withColumn('UniqueID', f.concat_ws('_', df_sc.SourceID, df_sc.CustomerID))\r\n",
+							"display(df_sc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 45
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Display final Fourth Coffee Customer Dataframe\r\n",
+							"\r\n",
+							"final_fc = df_fc.select(col(\"CustomerID\"),col(\"FirstName\"),col(\"LastName\"),col(\"PhoneNumber\"),col(\"CreatedDate\"),col(\"UpdatedDate\"),col(\"SourceID\"),col(\"UniqueID\"))\r\n",
+							"\r\n",
+							"display(final_fc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 46
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Display final VanArsdel Customer Dataframe\r\n",
+							"\r\n",
+							"final_vc = df_vc.select(col(\"CustomerID\"),col(\"FirstName\"),col(\"LastName\"),col(\"PhoneNumber\"),col(\"CreatedDate\"),col(\"UpdatedDate\"),col(\"SourceID\"),col(\"UniqueID\"))\r\n",
+							"\r\n",
+							"display(final_vc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 47
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Display final Southridge Customer Dataframe\r\n",
+							"\r\n",
+							"final_sc = df_sc\r\n",
+							"\r\n",
+							"display(final_sc.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 48
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# concat vc and fc\r\n",
+							"df_customer = final_vc.union(final_fc)\r\n",
+							"\r\n",
+							"# add southridge data\r\n",
+							"df_customer = df_customer.union(final_sc)\r\n",
+							"\r\n",
+							"df_customer.count() == final_vc.count() + final_fc.count() + final_sc.count()"
+						],
+						"outputs": [],
+						"execution_count": 49
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"########################\r\n",
+							"## ADDRESS DATAFRAMES ##\r\n",
+							"########################\r\n",
+							"\r\n",
+							"#Create address tables for each \r\n",
+							"df_fa = df_fc\r\n",
+							"df_va = df_vc"
+						],
+						"outputs": [],
+						"execution_count": 50
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add AddressID Column to VanArsdel Address DF\r\n",
+							"\r\n",
+							"df_fa = df_fa.withColumn(\"AddressID\", lit(\"NULL\"))\r\n",
+							"\r\n",
+							"display(df_fa.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 51
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add AddressID Column to Fourth Coffee Address DF\r\n",
+							"\r\n",
+							"df_va = df_va.withColumn(\"AddressID\", lit(\"NULL\"))\r\n",
+							"\r\n",
+							"display(df_va.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 52
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Add UniqueID Column to Fourth Coffee Address DF\r\n",
+							"df_fa = df_fa.withColumn('UniqueID', f.concat_ws('_', df_fa.SourceID, df_fa.CustomerID, df_fa.AddressID))\r\n",
+							"\r\n",
+							"#Add UniqueID Column to VanArsdel Address DF\r\n",
+							"df_va = df_va.withColumn('UniqueID', f.concat_ws('_', df_va.SourceID, df_va.CustomerID, df_va.AddressID))\r\n",
+							"\r\n",
+							"display(df_fa.limit(3))\r\n",
+							"display(df_va.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 53
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Display final Fourth Coffee Address Table\r\n",
+							"\r\n",
+							"final_fa = df_fa.select(col(\"SourceID\"),col(\"UniqueID\"),col(\"AddressID\"),col(\"CustomerID\"),col(\"AddressLine1\"),col(\"AddressLine2\"),col(\"City\"),col(\"State\"),col(\"ZipCode\"),col(\"CreatedDate\"),col(\"UpdatedDate\"))\r\n",
+							"\r\n",
+							"display(final_fa.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 54
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"#Display final VanArsdel Address Table\r\n",
+							"\r\n",
+							"final_va = df_va.select(col(\"SourceID\"),col(\"UniqueID\"),col(\"AddressID\"),col(\"CustomerID\"),col(\"AddressLine1\"),col(\"AddressLine2\"),col(\"City\"),col(\"State\"),col(\"ZipCode\"),col(\"CreatedDate\"),col(\"UpdatedDate\"))\r\n",
+							"\r\n",
+							"display(final_va.limit(3))"
+						],
+						"outputs": [],
+						"execution_count": 55
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# read in southridge address\r\n",
+							"df_sa = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudsales/2022/05/11/Addresses-082917.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"\r\n",
+							"# add source id and unique id to southridge\r\n",
+							"df_sa = df_sa.withColumn(\"SourceID\", lit(1))\r\n",
+							"df_sa = df_sa.withColumn('UniqueID', f.concat_ws('_', df_sa.SourceID, df_sa.CustomerID, df_sa.AddressID))\r\n",
+							"\r\n",
+							"# stack fourthcoffee and vanarsdel\r\n",
+							"df_address = final_fa.union(final_va)\r\n",
+							"# stack southridge\r\n",
+							"df_address = df_address.union(df_sa)\r\n",
+							"\r\n",
+							"# test if count of final data frame equals sum of individual data frames\r\n",
+							"df_address.count() == final_fa.count() + final_va.count() + df_sa.count()"
+						],
+						"outputs": [],
+						"execution_count": 56
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Join"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Join Master Customer table with Master Address table\r\n",
+							"master_customer_set = df_customer.join(df_address, df_customer.CustomerID==df_address.CustomerID, \"left\")\r\n",
+							"master_customer_set = master_customer_set.drop(df_address.CreatedDate).drop(df_address.CustomerID).drop(df_address.SourceID).drop(df_address.UniqueID).drop(df_address.UpdatedDate).drop(df_customer.CustomerID)\r\n",
+							"\r\n",
+							"from pyspark.sql import SparkSession \r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime\r\n",
+							"\r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"master_customer_set = master_customer_set.repartition(1)\r\n",
+							"dt = datetime.now()\r\n",
+							"filepath = f\"{adls_path}customer_address/\" \r\n",
+							"master_customer_set.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"master_customer_set.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"master_customer_set.write.json(f\"{filepath}json/\", mode='overwrite')\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 73
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_dvd_sales')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "b03376ad-3a7e-4f81-a153-1bf5a77f1945"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"microsoft": {
+								"language": "python"
+							},
+							"collapsed": false
+						},
+						"source": [
+							"%%pyspark\r\n",
+							"df_orders = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudsales/2022/05/11/Orders-082917.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"\r\n",
+							"df_order_details = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudsales/2022/05/11/OrderDetails-082917.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"df_order_details = df_order_details.drop(df_order_details.CreatedDate).drop(df_order_details.UpdatedDate)"
+						],
+						"outputs": [],
+						"execution_count": 24
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_orders.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 25
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_order_details.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 26
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"df_sales = df_orders.join(df_order_details, df_orders.OrderID == df_order_details.OrderID, \"leftouter\")\r\n",
+							"df_sales = df_sales.drop(df_order_details.OrderID)\r\n",
+							"display(df_sales.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 27
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"from pyspark.sql.functions import lit\r\n",
+							"from pyspark.sql.functions import concat\r\n",
+							"\r\n",
+							"df_sales = df_sales.withColumn(\"SourceID\", lit(1))\r\n",
+							"df_sales = df_sales.withColumn(\"UniqueOrderID\", concat(df_sales.SourceID, df_sales.OrderDetailID))\r\n",
+							"\r\n",
+							"display(df_sales.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 28
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql import SparkSession \r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime\r\n",
+							"   \r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"\r\n",
+							"df_sales = df_sales.repartition(1)\r\n",
+							"\r\n",
+							"dt = datetime.now()\r\n",
+							"\r\n",
+							"filepath = f\"{adls_path}dvd_sales/\" \r\n",
+							"\r\n",
+							"df_sales.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"df_sales.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"df_sales.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": 31
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_fourthcoffee_transactions')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "57267f63-f295-4756-b931-8a6d4e611997"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
+							"from pyspark.sql.functions import *\r\n",
+							"from pyspark.sql.types import *"
+						],
+						"outputs": [],
+						"execution_count": 15
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"microsoft": {
+								"language": "python"
+							}
+						},
+						"source": [
+							"%%pyspark\r\n",
+							"\r\n",
+							"def read_dataframe(filename):\r\n",
+							"    df = spark.read.load(\r\n",
+							"        f'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/transactions/{filename}.csv', \r\n",
+							"        format='csv', sep=',')\r\n",
+							"    return df\r\n",
+							"\r\n",
+							"\r\n",
+							"def append_dataframes(dataframes_list):\r\n",
+							"    df = dataframes_list[0]\r\n",
+							"    for next_df in dataframes[1:]:\r\n",
+							"        df = df.union(next_df)\r\n",
+							"    return df\r\n",
+							"\r\n",
+							"\r\n",
+							"# CREATE LIST OF FILENAMES\r\n",
+							"filenames = [f\"2018-{month:02d}-{i:02d}\" for month in [1,3] for i in range(1, 32)]\r\n",
+							"filenames += [f\"2018-02-{i:02d}\" for i in range(1, 29)]\r\n",
+							"filenames += [f\"2018-04-{i:02d}\" for i in range(1, 11)]\r\n",
+							"\r\n",
+							"# CONVERT LIST OF FILENAMES TO LIST OF DATAFRAMES\r\n",
+							"dataframes = [read_dataframe(filename) for filename in filenames]\r\n",
+							"\r\n",
+							"# --> Example of Python List Comprehension\r\n",
+							"#dataframes = []\r\n",
+							"#for filename in filenames:\r\n",
+							"#    dataframes.append(read_dataframe(filename))\r\n",
+							"\r\n",
+							"# create function to union all dataframes in list\r\n",
+							"df = append_dataframes(dataframes)\r\n",
+							"\r\n",
+							"test_count = 0\r\n",
+							"for dataframe in dataframes:\r\n",
+							"    test_count += dataframe.count()\r\n",
+							"\r\n",
+							"df.count() == test_count\r\n",
+							"\r\n",
+							"df = df.select(\r\n",
+							"    df._c0.alias('TransactionID'),\r\n",
+							"    df._c1.alias('CustomerID'),\r\n",
+							"    df._c2.alias('MovieID'),\r\n",
+							"    df._c3.alias('RentalDate'),\r\n",
+							"    df._c4.alias('ReturnDate'),\r\n",
+							"    df._c5.alias('RentalCost'),\r\n",
+							"    df._c6.alias('LateFee'),\r\n",
+							"    df._c7.alias('RewindFlag'),\r\n",
+							"    df._c8.alias('CreatedDate'),\r\n",
+							"    df._c9.alias('UpdatedDate'))\r\n",
+							"\r\n",
+							"# convert to date\r\n",
+							"df = df.withColumn(\"RentalDate\", to_date(df.RentalDate, \"yyyyMMdd\"))\r\n",
+							"df = df.withColumn(\"ReturnDate\", to_date(df.ReturnDate, \"yyyyMMdd\"))\r\n",
+							"df = df.withColumn(\"CreatedDate\", to_date(df.ReturnDate, \"yyyy-MM-dd\"))\r\n",
+							"df = df.withColumn(\"UpdatedDate\", to_date(df.ReturnDate, \"yyyy-MM-dd\"))\r\n",
+							"\r\n",
+							"df = df.withColumn(\"RentalCost\", df.RentalCost.cast(FloatType()))\r\n",
+							"df = df.withColumn(\"LateFee\", df.LateFee.cast(FloatType()))\r\n",
+							"df = df.withColumn(\"RewindFlag\", df.RewindFlag.cast(BooleanType()))"
+						],
+						"outputs": [],
+						"execution_count": 20
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df.limit(10))"
+						],
+						"outputs": [],
+						"execution_count": 21
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df.printSchema()"
+						],
+						"outputs": [],
+						"execution_count": 22
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql import SparkSession \r\n",
+							"   \r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"\r\n",
+							"df = df.repartition(1)\r\n",
+							"\r\n",
+							"filepath = f\"{adls_path}fourthcoffee_transactions/\" \r\n",
+							"\r\n",
+							"df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"df.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": 24
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_rentals')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "07023325-f1a5-4f3f-ada3-a005ae40202b"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"microsoft": {
+								"language": "python"
+							},
+							"collapsed": false
+						},
+						"source": [
+							"%%pyspark\r\n",
+							"\r\n",
+							"from pyspark.sql.functions import lit, concat, to_timestamp\r\n",
+							"from pyspark.sql.types import *\r\n",
+							"\r\n",
+							"def add_columns(source_id, df):\r\n",
+							"    df = df.withColumn(\"SourceID\", lit(source_id))\r\n",
+							"    df = df.withColumn(\"UniqueTransactionID\", concat(df.SourceID, df.TransactionID))\r\n",
+							"    df = df.withColumn(\"UniqueMovieID\",concat(df.SourceID, df.MovieID))\r\n",
+							"    df = df.withColumn(\"UniqueCustomerID\", concat(df.SourceID, df.CustomerID))\r\n",
+							"    return df\r\n",
+							"\r\n",
+							"schema = StructType([ \\\r\n",
+							"    StructField(\"TransactionID\", StringType(), True), \\\r\n",
+							"    StructField(\"CustomerID\", StringType(), True), \\\r\n",
+							"    StructField(\"MovieID\", StringType(), True), \\\r\n",
+							"    StructField(\"RentalDate\", StringType(), True), \\\r\n",
+							"    StructField(\"ReturnDate\", StringType(), True), \\\r\n",
+							"    StructField(\"RentalCost\", StringType(), True), \\\r\n",
+							"    StructField(\"LateFee\", StringType(), True), \\\r\n",
+							"    StructField(\"RewindFlag\", StringType(), True), \\\r\n",
+							"    StructField(\"CreatedDate\", StringType(), True), \\\r\n",
+							"    StructField(\"UpdatedDate\", StringType(), True)])\r\n",
+							"\r\n",
+							"df_f = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/fourthcoffee/rentals/Transactions.csv', \r\n",
+							"    format='csv', schema=schema)\r\n",
+							"\r\n",
+							"df_v = spark.read.load(\r\n",
+							"    'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/vanarsdelltd/OnPremRentals/2022/05/11/Transactions-085610.csv', \r\n",
+							"    format='csv', sep=';', header=True)\r\n",
+							"\r\n",
+							"df_f = add_columns(3, df_f)\r\n",
+							"df_v = add_columns(2, df_v)"
+						],
+						"outputs": [],
+						"execution_count": 42
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_f.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 43
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_v.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 44
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df_rentals =  df_f.union(df_v)"
+						],
+						"outputs": [],
+						"execution_count": 45
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"df_v.count() + df_f.count() == df_rentals.count()"
+						],
+						"outputs": [],
+						"execution_count": 46
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"df_rentals = df_rentals.withColumn(\"RentalDate\", to_timestamp(df_rentals.RentalDate, \"yyyyMMdd\"))\r\n",
+							"df_rentals = df_rentals.withColumn(\"ReturnDate\", to_timestamp(df_rentals.ReturnDate, \"yyyyMMdd\"))\r\n",
+							"df_rentals = df_rentals.withColumn(\"CreatedDate\", to_timestamp(df_rentals.CreatedDate))\r\n",
+							"df_rentals = df_rentals.withColumn(\"UpdatedDate\", to_timestamp(df_rentals.UpdatedDate))\r\n",
+							"df_rentals = df_rentals.withColumn(\"LateFee\", df_rentals.LateFee.cast(FloatType()))\r\n",
+							"df_rentals = df_rentals.withColumn(\"RentalCost\", df_rentals.RentalCost.cast(FloatType()))\r\n",
+							"df_rentals = df_rentals.withColumn(\"SourceID\", df_rentals.SourceID.cast(IntegerType()))\r\n",
+							"\r\n",
+							"\r\n",
+							"display(df_rentals.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 47
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql import SparkSession \r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime\r\n",
+							"   \r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"\r\n",
+							"df_rentals = df_rentals.repartition(1)\r\n",
+							"\r\n",
+							"dt = datetime.now()\r\n",
+							"\r\n",
+							"filepath = f\"{adls_path}rentals/\" \r\n",
+							"\r\n",
+							"df_rentals.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"df_rentals.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"df_rentals.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": 48
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/transform_streaming')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "openhack_mdw"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "sparksmall001",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "b976e17b-ccd7-4d7b-a8f5-a7d43acb9210"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
+						"name": "sparksmall001",
+						"type": "Spark",
+						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 10,
+						"cores": 4,
+						"memory": 28,
+						"automaticScaleJobs": false
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"tags": [
+								"parameters"
+							]
+						},
+						"source": [
+							"year = \"*\"\r\n",
+							"month = \"*\"\r\n",
+							"day = \"*\""
+						],
+						"outputs": [],
+						"execution_count": 1
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"microsoft": {
+								"language": "python"
+							},
+							"tags": []
+						},
+						"source": [
+							"%%pyspark\r\n",
+							"from pyspark.sql.functions import concat\r\n",
+							"\r\n",
+							"uri= f'abfss://dls@dlsmdw778t05dev.dfs.core.windows.net/bronze/southridge/cloudstreaming/{year}/{month}/{day}/Transactions-*.csv'\r\n",
+							"df_streaming = spark.read.load(uri, format='csv', sep=';', header=True)\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 2
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import lit, concat, to_timestamp\r\n",
+							"df_streaming = df_streaming.withColumn(\"SourceID\",lit(1))\r\n",
+							"df_streaming = df_streaming.withColumn(\"UniqueOrderID\", concat(df_streaming.SourceID, df_streaming.TransactionID))\r\n",
+							"df_streaming = df_streaming.withColumn(\"UniqueMovieID\",concat(df_streaming.SourceID, df_streaming.MovieID))\r\n",
+							"df_streaming = df_streaming.withColumn(\"UniqueCustomerID\", concat(df_streaming.SourceID, df_streaming.CustomerID))\r\n",
+							"df_streaming = df_streaming.withColumn(\"StreamStart\", to_timestamp(df_streaming.StreamStart))\r\n",
+							"df_streaming = df_streaming.withColumn(\"StreamEnd\", to_timestamp(df_streaming.StreamEnd))\r\n",
+							"df_streaming = df_streaming.withColumn(\"CreatedDate\", to_timestamp(df_streaming.CreatedDate))\r\n",
+							"df_streaming = df_streaming.withColumn(\"UpdatedDate\", to_timestamp(df_streaming.UpdatedDate))"
+						],
+						"outputs": [],
+						"execution_count": 3
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_streaming.limit(5))\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 4
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql import SparkSession \r\n",
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime\r\n",
+							"   \r\n",
+							"account_name = 'dlsmdw778t05dev'\r\n",
+							"container_name = 'dls' \r\n",
+							"relative_path = 'silver/'\r\n",
+							"\r\n",
+							"adls_path = 'abfss://%s@%s.dfs.core.windows.net/%s' % (container_name, account_name, relative_path) \r\n",
+							"print('Primary storage account path: ' + adls_path) \r\n",
+							"\r\n",
+							"df_streaming = df_streaming.repartition(1)\r\n",
+							"\r\n",
+							"dt = datetime.now()\r\n",
+							"\r\n",
+							"filepath = f\"{adls_path}streaming/\" \r\n",
+							"\r\n",
+							"df_streaming.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
+							"df_streaming.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
+							"df_streaming.write.json(f\"{filepath}json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": 5
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/sparksmall001')]",
+			"type": "Microsoft.Synapse/workspaces/bigDataPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"autoPause": {
+					"enabled": true,
+					"delayInMinutes": 30
+				},
+				"autoScale": {
+					"enabled": true,
+					"maxNodeCount": 3,
+					"minNodeCount": 3
+				},
+				"nodeCount": 10,
+				"nodeSize": "Small",
+				"nodeSizeFamily": "MemoryOptimized",
+				"sparkVersion": "3.1",
+				"isComputeIsolationEnabled": false,
+				"sessionLevelPackagesEnabled": false,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westeurope"
+		}
+	]
+}

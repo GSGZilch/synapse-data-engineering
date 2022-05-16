@@ -1,0 +1,21 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"value": "om-weu-syn-001"
+		},
+		"ls_sqldb_datasource001_connectionString": {
+			"value": ""
+		},
+		"om-weu-syn-001-WorkspaceDefaultSqlServer_connectionString": {
+			"value": ""
+		},
+		"ls_adls_synw_properties_typeProperties_url": {
+			"value": "https://omweuadls001.dfs.core.windows.net"
+		},
+		"om-weu-syn-001-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://omweuadls001.dfs.core.windows.net"
+		}
+	}
+}
