@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "da5b59df-0da4-45fa-93eb-118f32a8d87f"
+				"spark.autotune.trackingId": "3aff8674-20d4-4dcf-8569-3facc14f2b34"
 			}
 		},
 		"metadata": {
@@ -50,10 +50,28 @@
 		"cells": [
 			{
 				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"print('Spark started.')"
+				],
+				"execution_count": 2
+			},
+			{
+				"cell_type": "code",
 				"source": [
 					"%run utils/pyspark_helper_functions"
 				],
-				"execution_count": 5
+				"execution_count": 3
 			},
 			{
 				"cell_type": "code",
@@ -72,24 +90,6 @@
 					"df = read_dataframe('abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/Customer_20220512-024629.csv')"
 				],
 				"execution_count": null
-			},
-			{
-				"cell_type": "code",
-				"metadata": {
-					"jupyter": {
-						"source_hidden": false,
-						"outputs_hidden": false
-					},
-					"nteract": {
-						"transient": {
-							"deleting": false
-						}
-					}
-				},
-				"source": [
-					"print('hello world')"
-				],
-				"execution_count": 3
 			}
 		]
 	}
