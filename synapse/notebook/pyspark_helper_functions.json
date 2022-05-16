@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "3f6e898d-4ba8-4f21-bbeb-a8dbe43b62ae"
+				"spark.autotune.trackingId": "61cb7dfd-3457-4aee-9ba2-acb88c6d2531"
 			}
 		},
 		"metadata": {
@@ -56,12 +56,12 @@
 			{
 				"cell_type": "code",
 				"source": [
-					"def read_dataframe(file_path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
-					"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
+					"def read_dataframe(path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
+					"    if file_type is None: file_type = path.split('.')[-1]\r\n",
 					"    df = spark.read.format(file_type)\r\n",
 					"    if header is not None: df = df.option('header', header)\r\n",
 					"    if schema is not None: df = df.schema(schema)\r\n",
-					"    df = df.load(file_path)\r\n",
+					"    df = df.load(path)\r\n",
 					"\r\n",
 					"    if verbose:\r\n",
 					"        df.printSchema()\r\n",
@@ -114,6 +114,30 @@
 					"\r\n",
 					"    # Extract year, month and day from pipeline trigger time\r\n",
 					"    return (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"def get_folder_path(tier, data_source_id, database_schema, entity, dt, extension=None):\r\n",
+					"    year, month, day, hour, minute, second = extract_datetime_attributes(dt)\r\n",
+					"    path = f\"abfss://data-platform@omweuadls001.dfs.core.windows.net/\"\r\n",
+					"    path += f\"{tier}/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}/\"\r\n",
+					"    path += f\"{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}\"\r\n",
+					"    if extension is not None: path += f\".{extension}\"\r\n",
+					"    return path"
 				],
 				"execution_count": null
 			}

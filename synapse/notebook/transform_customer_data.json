@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "c863399b-7641-4821-bfb2-0409e376e054"
+				"spark.autotune.trackingId": "d6bfb8fc-95d0-47bd-83ef-22ecbd97925c"
 			}
 		},
 		"metadata": {
@@ -101,13 +101,7 @@
 					"\r\n",
 					"# Create empty dictionaries for input datasets and schemas\r\n",
 					"df_dict = {}\r\n",
-					"schema_dict = {}\r\n",
-					"\r\n",
-					"# Path to workspace data lake\r\n",
-					"data_platform_path = \"abfss://data-platform@omweuadls001.dfs.core.windows.net\"\r\n",
-					"\r\n",
-					"# Add directories\r\n",
-					"folder_path = f\"{data_platform_path}/bronze/{data_source_id}/{database_schema}/{year}/{month}/{day}\""
+					"schema_dict = {}"
 				],
 				"execution_count": 27
 			},
@@ -264,8 +258,18 @@
 				},
 				"source": [
 					"for entity in entities:\r\n",
+					"\r\n",
+					"    input_path = get_folder_path(\r\n",
+					"        tier='bronze',\r\n",
+					"        data_source_id=data_source_id,\r\n",
+					"        database_schema=database_schema,\r\n",
+					"        entity=entity,\r\n",
+					"        dt=pipeline_trigger_time,\r\n",
+					"        extension=\"csv\"\r\n",
+					"    )\r\n",
+					"\r\n",
 					"    df_dict[entity] = read_dataframe(\r\n",
-					"        f'{folder_path}/{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
+					"        input_path,\r\n",
 					"        header='true',\r\n",
 					"        schema=schema_dict[entity])"
 				],
@@ -286,9 +290,18 @@
 				},
 				"source": [
 					"for entity in entities:\r\n",
+					"\r\n",
+					"    output_path = get_folder_path(\r\n",
+					"        tier='silver',\r\n",
+					"        data_source_id=data_source_id,\r\n",
+					"        database_schema=database_schema,\r\n",
+					"        entity=entity,\r\n",
+					"        dt=pipeline_trigger_time,\r\n",
+					"    )\r\n",
+					"\r\n",
 					"    write_dataframe(\r\n",
-					"        df_dict[entity],\r\n",
-					"        f\"{data_platform_path}/silver/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}\",\r\n",
+					"        df=df_dict[entity],\r\n",
+					"        path=output_path,\r\n",
 					"        partitions=1)"
 				],
 				"execution_count": null
