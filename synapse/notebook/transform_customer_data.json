@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "3c66ca46-d368-40f1-a9a1-05fb4d74d3c0"
+				"spark.autotune.trackingId": "a29fb1e7-01e0-4874-aaf2-416de9a02580"
 			}
 		},
 		"metadata": {
@@ -199,7 +199,17 @@
 					}
 				},
 				"source": [
-					"# schema"
+					"# Define schema for Address entity, no loops for readability\r\n",
+					"schema_dict[\"address\"] = StructType([\\\r\n",
+					"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
+					"    StructField(\"AddressLine1\", StringType(), True),\\\r\n",
+					"    StructField(\"AddressLine2\", StringType(), True),\\\r\n",
+					"    StructField(\"City\", StringType(), True),\\\r\n",
+					"    StructField(\"StateProvince\", StringType(), True),\\\r\n",
+					"    StructField(\"CountryRegion\", StringType(), True),\\\r\n",
+					"    StructField(\"PostalCode\", StringType(), True),\\\r\n",
+					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+					"    StructField(\"ModifiedDate\", DateType(), True)]) "
 				],
 				"execution_count": null
 			},
@@ -230,9 +240,28 @@
 					}
 				},
 				"source": [
-					"# schema"
+					"# Define schema for CustomerAddress entity, no loops for readability\r\n",
+					"schema_dict[\"customer_address\"] = StructType([\\\r\n",
+					"    StructField(\"CustomerID\", IntegerType(), False),\\\r\n",
+					"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
+					"    StructField(\"AddressType\", StringType(), True),\\\r\n",
+					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+					"    StructField(\"ModifiedDate\", DateType(), True)]) "
 				],
 				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Load datasets"
+				]
 			},
 			{
 				"cell_type": "code",
@@ -248,50 +277,13 @@
 					}
 				},
 				"source": [
-					"for entity_name in [\"customer\"]:\r\n",
+					"for entity_name in [\"customer\", \"address\", \"customer_address\"]:\r\n",
 					"    df_dict[entity_name] = read_dataframe(\r\n",
 					"        f'{folder_path}/{entity_name.capitalize()}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
 					"        header='true',\r\n",
 					"        schema=schema_dict[entity_name])"
 				],
 				"execution_count": 17
-			},
-			{
-				"cell_type": "code",
-				"metadata": {
-					"jupyter": {
-						"source_hidden": false,
-						"outputs_hidden": false
-					},
-					"nteract": {
-						"transient": {
-							"deleting": false
-						}
-					},
-					"collapsed": false
-				},
-				"source": [
-					"display(df_dict[\"customer\"].limit(5))"
-				],
-				"execution_count": 18
-			},
-			{
-				"cell_type": "code",
-				"metadata": {
-					"jupyter": {
-						"source_hidden": false,
-						"outputs_hidden": false
-					},
-					"nteract": {
-						"transient": {
-							"deleting": false
-						}
-					}
-				},
-				"source": [
-					"df_dict[\"customer\"].printSchema()"
-				],
-				"execution_count": 19
 			}
 		]
 	}
