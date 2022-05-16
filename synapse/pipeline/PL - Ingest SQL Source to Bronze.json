@@ -114,7 +114,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"folderPath": {
-											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{item().tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
 											"type": "Expression"
 										},
 										"filePath": {
