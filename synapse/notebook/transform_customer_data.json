@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "a29fb1e7-01e0-4874-aaf2-416de9a02580"
+				"spark.autotune.trackingId": "38090682-55a2-42c0-a3ed-cd040714f321"
 			}
 		},
 		"metadata": {
@@ -94,36 +94,23 @@
 					}
 				},
 				"source": [
+					"# Define relevant entities\r\n",
+					"entities = [\"Customer\", \"Address\", \"CustomerAddress\"]\r\n",
+					"\r\n",
 					"# Extract year, month and day from pipeline trigger time\r\n",
 					"year, month, day, hour, minute, second = extract_datetime_attributes(pipeline_trigger_time)\r\n",
 					"\r\n",
 					"# Create empty dictionaries for input datasets and schemas\r\n",
 					"df_dict = {}\r\n",
-					"schema_dict = {}"
-				],
-				"execution_count": 27
-			},
-			{
-				"cell_type": "code",
-				"metadata": {
-					"jupyter": {
-						"source_hidden": false,
-						"outputs_hidden": false
-					},
-					"nteract": {
-						"transient": {
-							"deleting": false
-						}
-					}
-				},
-				"source": [
+					"schema_dict = {}\r\n",
+					"\r\n",
 					"# Path to workspace data lake\r\n",
-					"folder_path = \"abfss://data-platform@omweuadls001.dfs.core.windows.net\"\r\n",
+					"data_platform_path = \"abfss://data-platform@omweuadls001.dfs.core.windows.net\"\r\n",
 					"\r\n",
 					"# Add directories\r\n",
-					"folder_path += f\"/bronze/{data_source_id}/{database_schema}/{year}/{month}/{day}\""
+					"folder_path = f\"{data_platform_path}/bronze/{data_source_id}/{database_schema}/{year}/{month}/{day}\""
 				],
-				"execution_count": null
+				"execution_count": 27
 			},
 			{
 				"cell_type": "markdown",
@@ -153,7 +140,7 @@
 				},
 				"source": [
 					"# Define schema for Customer entity, no loops for readability\r\n",
-					"schema_dict[\"customer\"] = StructType([\\\r\n",
+					"schema_dict[\"Customer\"] = StructType([\\\r\n",
 					"    StructField(\"CustomerID\", StringType(), False),\\\r\n",
 					"    StructField(\"NameStyle\", BooleanType(), True),\\\r\n",
 					"    StructField(\"Title\", StringType(), True),\\\r\n",
@@ -200,7 +187,7 @@
 				},
 				"source": [
 					"# Define schema for Address entity, no loops for readability\r\n",
-					"schema_dict[\"address\"] = StructType([\\\r\n",
+					"schema_dict[\"Address\"] = StructType([\\\r\n",
 					"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
 					"    StructField(\"AddressLine1\", StringType(), True),\\\r\n",
 					"    StructField(\"AddressLine2\", StringType(), True),\\\r\n",
@@ -241,7 +228,7 @@
 				},
 				"source": [
 					"# Define schema for CustomerAddress entity, no loops for readability\r\n",
-					"schema_dict[\"customer_address\"] = StructType([\\\r\n",
+					"schema_dict[\"CustomerAddress\"] = StructType([\\\r\n",
 					"    StructField(\"CustomerID\", IntegerType(), False),\\\r\n",
 					"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
 					"    StructField(\"AddressType\", StringType(), True),\\\r\n",
@@ -277,13 +264,35 @@
 					}
 				},
 				"source": [
-					"for entity_name in [\"customer\", \"address\", \"customer_address\"]:\r\n",
-					"    df_dict[entity_name] = read_dataframe(\r\n",
-					"        f'{folder_path}/{entity_name.capitalize()}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
+					"for entity in entities:\r\n",
+					"    df_dict[entity] = read_dataframe(\r\n",
+					"        f'{folder_path}/{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
 					"        header='true',\r\n",
-					"        schema=schema_dict[entity_name])"
+					"        schema=schema_dict[entity])"
 				],
 				"execution_count": 17
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"for entity in entities:\r\n",
+					"    write_dataframe(\r\n",
+					"        df_dict[entity],\r\n",
+					"        f\"{data_platform_path}/silver/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}\",\r\n",
+					"        partitions=1)"
+				],
+				"execution_count": null
 			}
 		]
 	}
