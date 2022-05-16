@@ -21,7 +21,8 @@
 					},
 					"parameters": {
 						"abc": {
-							"value": "5"
+							"value": "5",
+							"type": "int"
 						}
 					},
 					"snapshot": true,
