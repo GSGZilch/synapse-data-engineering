@@ -647,7 +647,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "3f6e898d-4ba8-4f21-bbeb-a8dbe43b62ae"
+						"spark.autotune.trackingId": "61cb7dfd-3457-4aee-9ba2-acb88c6d2531"
 					}
 				},
 				"metadata": {
@@ -687,13 +687,14 @@
 					},
 					{
 						"cell_type": "code",
+						"metadata": {},
 						"source": [
-							"def read_dataframe(file_path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
-							"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
+							"def read_dataframe(path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
+							"    if file_type is None: file_type = path.split('.')[-1]\r\n",
 							"    df = spark.read.format(file_type)\r\n",
 							"    if header is not None: df = df.option('header', header)\r\n",
 							"    if schema is not None: df = df.schema(schema)\r\n",
-							"    df = df.load(file_path)\r\n",
+							"    df = df.load(path)\r\n",
 							"\r\n",
 							"    if verbose:\r\n",
 							"        df.printSchema()\r\n",
@@ -748,6 +749,31 @@
 							"\r\n",
 							"    # Extract year, month and day from pipeline trigger time\r\n",
 							"    return (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"def get_folder_path(tier, data_source_id, database_schema, entity, dt, extension=None):\r\n",
+							"    year, month, day, hour, minute, second = extract_datetime_attributes(dt)\r\n",
+							"    path = f\"abfss://data-platform@omweuadls001.dfs.core.windows.net/\"\r\n",
+							"    path += f\"{tier}/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}/\"\r\n",
+							"    path += f\"{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}\"\r\n",
+							"    if extension is not None: path += f\".{extension}\"\r\n",
+							"    return path"
 						],
 						"outputs": [],
 						"execution_count": null
@@ -1472,7 +1498,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "c863399b-7641-4821-bfb2-0409e376e054"
+						"spark.autotune.trackingId": "beadaf62-1f5c-4afb-8e63-21493226c48d"
 					}
 				},
 				"metadata": {
@@ -1554,18 +1580,9 @@
 							"# Define relevant entities\r\n",
 							"entities = [\"Customer\", \"Address\", \"CustomerAddress\"]\r\n",
 							"\r\n",
-							"# Extract year, month and day from pipeline trigger time\r\n",
-							"year, month, day, hour, minute, second = extract_datetime_attributes(pipeline_trigger_time)\r\n",
-							"\r\n",
 							"# Create empty dictionaries for input datasets and schemas\r\n",
 							"df_dict = {}\r\n",
-							"schema_dict = {}\r\n",
-							"\r\n",
-							"# Path to workspace data lake\r\n",
-							"data_platform_path = \"abfss://data-platform@omweuadls001.dfs.core.windows.net\"\r\n",
-							"\r\n",
-							"# Add directories\r\n",
-							"folder_path = f\"{data_platform_path}/bronze/{data_source_id}/{database_schema}/{year}/{month}/{day}\""
+							"schema_dict = {}"
 						],
 						"outputs": [],
 						"execution_count": 27
@@ -1726,8 +1743,18 @@
 						},
 						"source": [
 							"for entity in entities:\r\n",
+							"\r\n",
+							"    input_path = get_folder_path(\r\n",
+							"        tier='bronze',\r\n",
+							"        data_source_id=data_source_id,\r\n",
+							"        database_schema=database_schema,\r\n",
+							"        entity=entity,\r\n",
+							"        dt=pipeline_trigger_time,\r\n",
+							"        extension=\"csv\"\r\n",
+							"    )\r\n",
+							"\r\n",
 							"    df_dict[entity] = read_dataframe(\r\n",
-							"        f'{folder_path}/{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
+							"        input_path,\r\n",
 							"        header='true',\r\n",
 							"        schema=schema_dict[entity])"
 						],
@@ -1749,9 +1776,18 @@
 						},
 						"source": [
 							"for entity in entities:\r\n",
+							"\r\n",
+							"    output_path = get_folder_path(\r\n",
+							"        tier='silver',\r\n",
+							"        data_source_id=data_source_id,\r\n",
+							"        database_schema=database_schema,\r\n",
+							"        entity=entity,\r\n",
+							"        dt=pipeline_trigger_time,\r\n",
+							"    )\r\n",
+							"\r\n",
 							"    write_dataframe(\r\n",
-							"        df_dict[entity],\r\n",
-							"        f\"{data_platform_path}/silver/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}\",\r\n",
+							"        df=df_dict[entity],\r\n",
+							"        path=output_path,\r\n",
 							"        partitions=1)"
 						],
 						"outputs": [],
