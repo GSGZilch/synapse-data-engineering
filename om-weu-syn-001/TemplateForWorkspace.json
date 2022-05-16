@@ -488,7 +488,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "899bbce4-1644-4816-9fba-bf76c4f62416"
+						"spark.autotune.trackingId": "f451a886-ed71-4264-b758-e759483f3221"
 					}
 				},
 				"metadata": {
@@ -527,13 +527,12 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"def read_dataframe(file_path, file_type, header=None, schema=None, verbose=False):    \r\n",
 							"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
 							"    df = spark.read.format(file_type)\r\n",
 							"    if header is not None: df = df.option('header', header)\r\n",
-							"    if schema is not None: df = df.schema(schema)\\\r\n",
+							"    if schema is not None: df = df.schema(schema)\r\n",
 							"    df = df.load(file_path)\r\n",
 							"\r\n",
 							"    if verbose:\r\n",
@@ -597,7 +596,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "facb9f47-f776-4a3d-9f8e-785b58b11f77"
+						"spark.autotune.trackingId": "321f96b3-06e0-4097-9844-fb6f1bd78b47"
 					}
 				},
 				"metadata": {
@@ -622,8 +621,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -1290,7 +1288,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "3d0bca37-4edc-49bc-9123-119d6fcec679"
+						"spark.autotune.trackingId": "05046a66-ccf3-4de0-8ed2-14474b1c5508"
 					}
 				},
 				"metadata": {
@@ -1338,7 +1336,7 @@
 							"print('Spark started.')"
 						],
 						"outputs": [],
-						"execution_count": 2
+						"execution_count": 1
 					},
 					{
 						"cell_type": "code",
@@ -1396,7 +1394,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "65108ea5-ca34-4367-8018-52838a28b4ce"
+						"spark.autotune.trackingId": "6fe7c8fb-1cf9-473e-a7eb-dc778f200c97"
 					}
 				},
 				"metadata": {
@@ -1421,8 +1419,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -2077,7 +2074,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "b03376ad-3a7e-4f81-a153-1bf5a77f1945"
+						"spark.autotune.trackingId": "7f2fee98-624c-4919-afbc-c9cf03f1fd5e"
 					}
 				},
 				"metadata": {
@@ -2102,8 +2099,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -2284,7 +2280,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "57267f63-f295-4756-b931-8a6d4e611997"
+						"spark.autotune.trackingId": "d20023cb-dd1f-4607-a252-4777341b642c"
 					}
 				},
 				"metadata": {
@@ -2309,8 +2305,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -2508,7 +2503,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "07023325-f1a5-4f3f-ada3-a005ae40202b"
+						"spark.autotune.trackingId": "ed857ac9-23a3-4173-8e7f-85d142dbe99f"
 					}
 				},
 				"metadata": {
@@ -2533,8 +2528,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -2760,7 +2754,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "b976e17b-ccd7-4d7b-a8f5-a7d43acb9210"
+						"spark.autotune.trackingId": "9e16f9c9-30b1-4ac5-aacd-38165da3315c"
 					}
 				},
 				"metadata": {
@@ -2785,8 +2779,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -2931,7 +2924,7 @@
 			"properties": {
 				"autoPause": {
 					"enabled": true,
-					"delayInMinutes": 30
+					"delayInMinutes": 120
 				},
 				"autoScale": {
 					"enabled": true,
