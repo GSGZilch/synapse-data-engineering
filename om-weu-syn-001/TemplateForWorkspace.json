@@ -488,7 +488,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "f451a886-ed71-4264-b758-e759483f3221"
+						"spark.autotune.trackingId": "9cfce9f9-9087-4a57-9f0a-838919ceddc6"
 					}
 				},
 				"metadata": {
@@ -527,8 +527,9 @@
 					},
 					{
 						"cell_type": "code",
+						"metadata": {},
 						"source": [
-							"def read_dataframe(file_path, file_type, header=None, schema=None, verbose=False):    \r\n",
+							"def read_dataframe(file_path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
 							"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
 							"    df = spark.read.format(file_type)\r\n",
 							"    if header is not None: df = df.option('header', header)\r\n",
@@ -1288,7 +1289,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "05046a66-ccf3-4de0-8ed2-14474b1c5508"
+						"spark.autotune.trackingId": "84e69484-cde5-429b-ac01-41665a8c132c"
 					}
 				},
 				"metadata": {
@@ -1345,7 +1346,7 @@
 							"%run utils/pyspark_helper_functions"
 						],
 						"outputs": [],
-						"execution_count": 3
+						"execution_count": 4
 					},
 					{
 						"cell_type": "code",
@@ -1362,6 +1363,25 @@
 						},
 						"source": [
 							"df = read_dataframe('abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/Customer_20220512-024629.csv')"
+						],
+						"outputs": [],
+						"execution_count": 5
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							""
 						],
 						"outputs": [],
 						"execution_count": null
