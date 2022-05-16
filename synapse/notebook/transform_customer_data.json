@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "25873da3-e90e-492b-975d-b6b5c0fdcf86"
+				"spark.autotune.trackingId": "dd0f01ac-93fe-4bb6-b8d7-c9b765b83b71"
 			}
 		},
 		"metadata": {
@@ -50,28 +50,10 @@
 		"cells": [
 			{
 				"cell_type": "code",
-				"metadata": {
-					"jupyter": {
-						"source_hidden": false,
-						"outputs_hidden": false
-					},
-					"nteract": {
-						"transient": {
-							"deleting": false
-						}
-					}
-				},
-				"source": [
-					"print('Spark started.')"
-				],
-				"execution_count": 1
-			},
-			{
-				"cell_type": "code",
 				"source": [
 					"%run utils/pyspark_helper_functions"
 				],
-				"execution_count": 4
+				"execution_count": 8
 			},
 			{
 				"cell_type": "code",
@@ -87,9 +69,23 @@
 					}
 				},
 				"source": [
-					"df = read_dataframe('abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/Customer_20220512-024629.csv')"
+					"df_dict = {}\r\n",
+					"schema_dict = {}"
 				],
-				"execution_count": 5
+				"execution_count": 15
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Dataset 1: Customer"
+				]
 			},
 			{
 				"cell_type": "code",
@@ -105,9 +101,146 @@
 					}
 				},
 				"source": [
-					""
+					"# Define schema for Customer entity, no loops for readability\r\n",
+					"schema_dict[\"customer\"] = StructType([\\\r\n",
+					"    StructField(\"CustomerID\", StringType(), False),\\\r\n",
+					"    StructField(\"NameStyle\", BooleanType(), True),\\\r\n",
+					"    StructField(\"Title\", StringType(), True),\\\r\n",
+					"    StructField(\"FirstName\", StringType(), True),\\\r\n",
+					"    StructField(\"MiddleName\", StringType(), True),\\\r\n",
+					"    StructField(\"LastName\", StringType(), True),\\\r\n",
+					"    StructField(\"Suffix\", StringType(), True),\\\r\n",
+					"    StructField(\"CompanyName\", StringType(), True),\\\r\n",
+					"    StructField(\"SalesPerson\", StringType(), True),\\\r\n",
+					"    StructField(\"EmailAddress\", StringType(), True),\\\r\n",
+					"    StructField(\"Phone\", StringType(), True),\\\r\n",
+					"    StructField(\"PasswordHash\", StringType(), True),\\\r\n",
+					"    StructField(\"PasswordSalt\", StringType(), True),\\\r\n",
+					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+					"    StructField(\"ModifiedDate\", DateType(), True)]) "
+				],
+				"execution_count": 16
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Dataset 2: Address"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# schema"
 				],
 				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Dataset 3: Customer Address"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# schema"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"for entity_name in [\"customer\"]:\r\n",
+					"    df_dict[entity_name] = read_dataframe(\r\n",
+					"        f'abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/{entity_name.capitalize()}_20220512-024629.csv',\r\n",
+					"        header='true',\r\n",
+					"        schema=schema_dict[entity_name])"
+				],
+				"execution_count": 17
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_dict[\"customer\"].limit(5))"
+				],
+				"execution_count": 18
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"df_dict[\"customer\"].printSchema()"
+				],
+				"execution_count": 19
 			}
 		]
 	}
