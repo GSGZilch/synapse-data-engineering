@@ -469,6 +469,53 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/parameter_test')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "4d68e9a8-3c25-4b89-8f71-4452da443c05"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {},
+						"source": [
+							"a = 1\r\n",
+							"print(a)"
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/pyspark_helper_functions')]",
 			"type": "Microsoft.Synapse/workspaces/notebooks",
 			"apiVersion": "2019-06-01-preview",
@@ -488,7 +535,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "9cfce9f9-9087-4a57-9f0a-838919ceddc6"
+						"spark.autotune.trackingId": "74282b23-bbd8-4bbc-a173-cff6052a733d"
 					}
 				},
 				"metadata": {
@@ -527,7 +574,6 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"def read_dataframe(file_path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
 							"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
@@ -1289,7 +1335,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "84e69484-cde5-429b-ac01-41665a8c132c"
+						"spark.autotune.trackingId": "dd0f01ac-93fe-4bb6-b8d7-c9b765b83b71"
 					}
 				},
 				"metadata": {
@@ -1314,39 +1360,18 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
 				"cells": [
 					{
 						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							}
-						},
-						"source": [
-							"print('Spark started.')"
-						],
-						"outputs": [],
-						"execution_count": 1
-					},
-					{
-						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"%run utils/pyspark_helper_functions"
 						],
 						"outputs": [],
-						"execution_count": 4
+						"execution_count": 8
 					},
 					{
 						"cell_type": "code",
@@ -1362,10 +1387,24 @@
 							}
 						},
 						"source": [
-							"df = read_dataframe('abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/Customer_20220512-024629.csv')"
+							"df_dict = {}\r\n",
+							"schema_dict = {}"
 						],
 						"outputs": [],
-						"execution_count": 5
+						"execution_count": 15
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Dataset 1: Customer"
+						]
 					},
 					{
 						"cell_type": "code",
@@ -1381,10 +1420,152 @@
 							}
 						},
 						"source": [
-							""
+							"# Define schema for Customer entity, no loops for readability\r\n",
+							"schema_dict[\"customer\"] = StructType([\\\r\n",
+							"    StructField(\"CustomerID\", StringType(), False),\\\r\n",
+							"    StructField(\"NameStyle\", BooleanType(), True),\\\r\n",
+							"    StructField(\"Title\", StringType(), True),\\\r\n",
+							"    StructField(\"FirstName\", StringType(), True),\\\r\n",
+							"    StructField(\"MiddleName\", StringType(), True),\\\r\n",
+							"    StructField(\"LastName\", StringType(), True),\\\r\n",
+							"    StructField(\"Suffix\", StringType(), True),\\\r\n",
+							"    StructField(\"CompanyName\", StringType(), True),\\\r\n",
+							"    StructField(\"SalesPerson\", StringType(), True),\\\r\n",
+							"    StructField(\"EmailAddress\", StringType(), True),\\\r\n",
+							"    StructField(\"Phone\", StringType(), True),\\\r\n",
+							"    StructField(\"PasswordHash\", StringType(), True),\\\r\n",
+							"    StructField(\"PasswordSalt\", StringType(), True),\\\r\n",
+							"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+							"    StructField(\"ModifiedDate\", DateType(), True)]) "
+						],
+						"outputs": [],
+						"execution_count": 16
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Dataset 2: Address"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# schema"
 						],
 						"outputs": [],
 						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Dataset 3: Customer Address"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# schema"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"for entity_name in [\"customer\"]:\r\n",
+							"    df_dict[entity_name] = read_dataframe(\r\n",
+							"        f'abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/{entity_name.capitalize()}_20220512-024629.csv',\r\n",
+							"        header='true',\r\n",
+							"        schema=schema_dict[entity_name])"
+						],
+						"outputs": [],
+						"execution_count": 17
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(df_dict[\"customer\"].limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 18
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df_dict[\"customer\"].printSchema()"
+						],
+						"outputs": [],
+						"execution_count": 19
 					}
 				]
 			},
@@ -2961,6 +3142,19 @@
 			},
 			"dependsOn": [],
 			"location": "westeurope"
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Pipeline 1')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
 		}
 	]
 }
