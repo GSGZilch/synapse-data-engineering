@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "e181cbac-7a96-48b1-82a6-f72c66c90d63"
+				"spark.autotune.trackingId": "899bbce4-1644-4816-9fba-bf76c4f62416"
 			}
 		},
 		"metadata": {
@@ -56,6 +56,7 @@
 				"cell_type": "code",
 				"source": [
 					"def read_dataframe(file_path, file_type, header=None, schema=None, verbose=False):    \r\n",
+					"    if file_type is None: file_type = file_path.split('.')[-1]\r\n",
 					"    df = spark.read.format(file_type)\r\n",
 					"    if header is not None: df = df.option('header', header)\r\n",
 					"    if schema is not None: df = df.schema(schema)\\\r\n",
