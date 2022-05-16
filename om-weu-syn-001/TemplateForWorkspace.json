@@ -35,7 +35,7 @@
 			"properties": {
 				"activities": [
 					{
-						"name": "PL - Ingest SQL Source to Bronze",
+						"name": "10_100 - SalesLT - Ingest SQL Source to Bronze",
 						"type": "ExecutePipeline",
 						"dependsOn": [],
 						"userProperties": [],
@@ -78,6 +78,58 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/pipelines/PL - Ingest SQL Source to Bronze')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/P02 - Data Transformation')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "10_100 - SalesLT - Transform Customer Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL - Transform Customer Data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"databaseSchema": "SalesLT",
+								"dataSourceID": {
+									"value": "@pipeline().parameters.dataSourceID",
+									"type": "Expression"
+								},
+								"dateAndTimeOfImport": {
+									"value": "@pipeline().parameters.dateAndTimeOfImport",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"dateAndTimeOfImport": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "_LoadEntity"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/PL - Transform Customer Data')]"
 			]
 		},
 		{
@@ -198,7 +250,7 @@
 											"type": "DatasetReference",
 											"parameters": {
 												"folderPath": {
-													"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+													"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{item().tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
 													"type": "Expression"
 												},
 												"filePath": {
@@ -268,6 +320,33 @@
 								"dataSourceID": "01_100"
 							}
 						}
+					},
+					{
+						"name": "P02 - Data Transformation",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "P01 - Data Ingestion",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "P02 - Data Transformation",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"dateAndTimeOfImport": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"dataSourceID": "01_100"
+							}
+						}
 					}
 				],
 				"policy": {
@@ -277,17 +356,18 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/pipelines/P01 - Data Ingestion')]"
+				"[concat(variables('workspaceId'), '/pipelines/P01 - Data Ingestion')]",
+				"[concat(variables('workspaceId'), '/pipelines/P02 - Data Transformation')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/Pipeline 1')]",
+			"name": "[concat(parameters('workspaceName'), '/PL - Transform Customer Data')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"activities": [
 					{
-						"name": "Notebook1",
+						"name": "Transform Customer Data",
 						"type": "SynapseNotebook",
 						"dependsOn": [],
 						"policy": {
@@ -300,13 +380,30 @@
 						"userProperties": [],
 						"typeProperties": {
 							"notebook": {
-								"referenceName": "parameter_test",
+								"referenceName": "transform_customer_data",
 								"type": "NotebookReference"
 							},
 							"parameters": {
-								"abc": {
-									"value": "5",
-									"type": "int"
+								"data_source_id": {
+									"value": {
+										"value": "@pipeline().parameters.dataSourceID",
+										"type": "Expression"
+									},
+									"type": "string"
+								},
+								"database_schema": {
+									"value": {
+										"value": "@pipeline().parameters.databaseSchema",
+										"type": "Expression"
+									},
+									"type": "string"
+								},
+								"pipeline_trigger_time": {
+									"value": {
+										"value": "@formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy-MM-dd hh:mm:ss')",
+										"type": "Expression"
+									},
+									"type": "string"
 								}
 							},
 							"snapshot": true,
@@ -321,10 +418,24 @@
 					"elapsedTimeMetric": {},
 					"cancelAfter": {}
 				},
+				"parameters": {
+					"databaseSchema": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					},
+					"dateAndTimeOfImport": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "P02 - Data Transformation"
+				},
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/notebooks/parameter_test')]",
+				"[concat(variables('workspaceId'), '/notebooks/transform_customer_data')]",
 				"[concat(variables('workspaceId'), '/bigDataPools/sparksmall001')]"
 			]
 		},
@@ -517,89 +628,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/parameter_test')]",
-			"type": "Microsoft.Synapse/workspaces/notebooks",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"nbformat": 4,
-				"nbformat_minor": 2,
-				"bigDataPool": {
-					"referenceName": "sparksmall001",
-					"type": "BigDataPoolReference"
-				},
-				"sessionProperties": {
-					"driverMemory": "28g",
-					"driverCores": 4,
-					"executorMemory": "28g",
-					"executorCores": 4,
-					"numExecutors": 2,
-					"conf": {
-						"spark.dynamicAllocation.enabled": "false",
-						"spark.dynamicAllocation.minExecutors": "2",
-						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "25b01084-8eb9-4e9f-934c-f06d409735a7"
-					}
-				},
-				"metadata": {
-					"saveOutput": true,
-					"enableDebugMode": false,
-					"kernelspec": {
-						"name": "synapse_pyspark",
-						"display_name": "python"
-					},
-					"language_info": {
-						"name": "python"
-					},
-					"a365ComputeOptions": {
-						"id": "/subscriptions/c9a2b097-83d7-4ec1-8355-dbd181b27e99/resourceGroups/om-synapse-demo/providers/Microsoft.Synapse/workspaces/om-weu-syn-001/bigDataPools/sparksmall001",
-						"name": "sparksmall001",
-						"type": "Spark",
-						"endpoint": "https://om-weu-syn-001.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/sparksmall001",
-						"auth": {
-							"type": "AAD",
-							"authResource": "https://dev.azuresynapse.net"
-						},
-						"sparkVersion": "3.1",
-						"nodeCount": 10,
-						"cores": 4,
-						"memory": 28
-					},
-					"sessionKeepAliveTimeout": 30
-				},
-				"cells": [
-					{
-						"cell_type": "code",
-						"source": [
-							"a = 1\r\n",
-							"print(a)"
-						],
-						"outputs": [],
-						"execution_count": null
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							}
-						},
-						"source": [
-							"print(abc)"
-						],
-						"outputs": [],
-						"execution_count": null
-					}
-				]
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/pyspark_helper_functions')]",
 			"type": "Microsoft.Synapse/workspaces/notebooks",
 			"apiVersion": "2019-06-01-preview",
@@ -619,7 +647,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "74282b23-bbd8-4bbc-a173-cff6052a733d"
+						"spark.autotune.trackingId": "3f6e898d-4ba8-4f21-bbeb-a8dbe43b62ae"
 					}
 				},
 				"metadata": {
@@ -651,7 +679,8 @@
 						"source": [
 							"from pyspark.sql.types import StructType, StructField, StringType, ArrayType\r\n",
 							"from pyspark.sql.functions import *\r\n",
-							"from pyspark.sql.types import *"
+							"from pyspark.sql.types import *\r\n",
+							"from datetime import datetime"
 						],
 						"outputs": [],
 						"execution_count": null
@@ -692,9 +721,33 @@
 							"def write_dataframe(df, path, partitions, csv=True, parquet=False, json=False):\r\n",
 							"    df = df.repartition(partitions)\r\n",
 							"\r\n",
-							"    if csv: df.write.csv(f\"{filepath}csv/\", mode='overwrite', header = 'true') \r\n",
-							"    if parquet: df.write.parquet(f\"{filepath}parquet/\", mode='overwrite') \r\n",
-							"    if json: df.write.json(f\"{filepath}json/\", mode='overwrite')"
+							"    if csv: df.write.csv(f\"{filepath}/csv/\", mode='overwrite', header = 'true') \r\n",
+							"    if parquet: df.write.parquet(f\"{filepath}/parquet/\", mode='overwrite') \r\n",
+							"    if json: df.write.json(f\"{filepath}/json/\", mode='overwrite')"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"def extract_datetime_attributes(dt: str):\r\n",
+							"    # Convert to datetime object\r\n",
+							"    dt = datetime.strptime(dt, \"%Y-%m-%d %H:%M:%S\")\r\n",
+							"\r\n",
+							"    # Extract year, month and day from pipeline trigger time\r\n",
+							"    return (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)"
 						],
 						"outputs": [],
 						"execution_count": null
@@ -1419,7 +1472,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "dd0f01ac-93fe-4bb6-b8d7-c9b765b83b71"
+						"spark.autotune.trackingId": "fb798282-3772-45d9-acb7-a537d3689a18"
 					}
 				},
 				"metadata": {
@@ -1444,13 +1497,40 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28
+						"memory": 28,
+						"automaticScaleJobs": false
 					},
 					"sessionKeepAliveTimeout": 30
 				},
 				"cells": [
 					{
 						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"tags": [
+								"parameters"
+							]
+						},
+						"source": [
+							"# Parameter cell to define default values for notebook input parameters\r\n",
+							"pipeline_trigger_time = \"2022-01-01 00:00:00\"\r\n",
+							"data_source_id = \"\"\r\n",
+							"database_schema = \"\""
+						],
+						"outputs": [],
+						"execution_count": 25
+					},
+					{
+						"cell_type": "code",
+						"metadata": {},
 						"source": [
 							"%run utils/pyspark_helper_functions"
 						],
@@ -1471,11 +1551,24 @@
 							}
 						},
 						"source": [
+							"# Define relevant entities\r\n",
+							"entities = [\"Customer\", \"Address\", \"CustomerAddress\"]\r\n",
+							"\r\n",
+							"# Extract year, month and day from pipeline trigger time\r\n",
+							"year, month, day, hour, minute, second = extract_datetime_attributes(pipeline_trigger_time)\r\n",
+							"\r\n",
+							"# Create empty dictionaries for input datasets and schemas\r\n",
 							"df_dict = {}\r\n",
-							"schema_dict = {}"
+							"schema_dict = {}\r\n",
+							"\r\n",
+							"# Path to workspace data lake\r\n",
+							"data_platform_path = \"abfss://data-platform@omweuadls001.dfs.core.windows.net\"\r\n",
+							"\r\n",
+							"# Add directories\r\n",
+							"folder_path = f\"{data_platform_path}/bronze/{data_source_id}/{database_schema}/{year}/{month}/{day}\""
 						],
 						"outputs": [],
-						"execution_count": 15
+						"execution_count": 27
 					},
 					{
 						"cell_type": "markdown",
@@ -1505,7 +1598,7 @@
 						},
 						"source": [
 							"# Define schema for Customer entity, no loops for readability\r\n",
-							"schema_dict[\"customer\"] = StructType([\\\r\n",
+							"schema_dict[\"Customer\"] = StructType([\\\r\n",
 							"    StructField(\"CustomerID\", StringType(), False),\\\r\n",
 							"    StructField(\"NameStyle\", BooleanType(), True),\\\r\n",
 							"    StructField(\"Title\", StringType(), True),\\\r\n",
@@ -1552,7 +1645,17 @@
 							}
 						},
 						"source": [
-							"# schema"
+							"# Define schema for Address entity, no loops for readability\r\n",
+							"schema_dict[\"Address\"] = StructType([\\\r\n",
+							"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
+							"    StructField(\"AddressLine1\", StringType(), True),\\\r\n",
+							"    StructField(\"AddressLine2\", StringType(), True),\\\r\n",
+							"    StructField(\"City\", StringType(), True),\\\r\n",
+							"    StructField(\"StateProvince\", StringType(), True),\\\r\n",
+							"    StructField(\"CountryRegion\", StringType(), True),\\\r\n",
+							"    StructField(\"PostalCode\", StringType(), True),\\\r\n",
+							"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+							"    StructField(\"ModifiedDate\", DateType(), True)]) "
 						],
 						"outputs": [],
 						"execution_count": null
@@ -1584,10 +1687,29 @@
 							}
 						},
 						"source": [
-							"# schema"
+							"# Define schema for CustomerAddress entity, no loops for readability\r\n",
+							"schema_dict[\"CustomerAddress\"] = StructType([\\\r\n",
+							"    StructField(\"CustomerID\", IntegerType(), False),\\\r\n",
+							"    StructField(\"AddressID\", IntegerType(), False),\\\r\n",
+							"    StructField(\"AddressType\", StringType(), True),\\\r\n",
+							"    StructField(\"rowguid\", StringType(), True),\\\r\n",
+							"    StructField(\"ModifiedDate\", DateType(), True)]) "
 						],
 						"outputs": [],
 						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"## Load datasets"
+						]
 					},
 					{
 						"cell_type": "code",
@@ -1603,11 +1725,11 @@
 							}
 						},
 						"source": [
-							"for entity_name in [\"customer\"]:\r\n",
-							"    df_dict[entity_name] = read_dataframe(\r\n",
-							"        f'abfss://data-platform@omweuadls001.dfs.core.windows.net/bronze/01_100/SalesLT/2022/05/12/{entity_name.capitalize()}_20220512-024629.csv',\r\n",
+							"for entity in entities:\r\n",
+							"    df_dict[entity] = read_dataframe(\r\n",
+							"        f'{folder_path}/{entity}_{year}{month:02d}{day:02d}-{hour:02d}{minute:02d}{second:02d}.csv',\r\n",
 							"        header='true',\r\n",
-							"        schema=schema_dict[entity_name])"
+							"        schema=schema_dict[entity])"
 						],
 						"outputs": [],
 						"execution_count": 17
@@ -1623,33 +1745,17 @@
 								"transient": {
 									"deleting": false
 								}
-							},
-							"collapsed": false
-						},
-						"source": [
-							"display(df_dict[\"customer\"].limit(5))"
-						],
-						"outputs": [],
-						"execution_count": 18
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
 							}
 						},
 						"source": [
-							"df_dict[\"customer\"].printSchema()"
+							"for entity in entities:\r\n",
+							"    write_dataframe(\r\n",
+							"        df_dict[entity],\r\n",
+							"        f\"{data_platform_path}/silver/{data_source_id}/{database_schema}/{entity}/{year}/{month}/{day}\",\r\n",
+							"        partitions=1)"
 						],
 						"outputs": [],
-						"execution_count": 19
+						"execution_count": null
 					}
 				]
 			},
