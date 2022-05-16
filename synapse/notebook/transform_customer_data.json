@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "d6bfb8fc-95d0-47bd-83ef-22ecbd97925c"
+				"spark.autotune.trackingId": "beadaf62-1f5c-4afb-8e63-21493226c48d"
 			}
 		},
 		"metadata": {
@@ -95,9 +95,6 @@
 				"source": [
 					"# Define relevant entities\r\n",
 					"entities = [\"Customer\", \"Address\", \"CustomerAddress\"]\r\n",
-					"\r\n",
-					"# Extract year, month and day from pipeline trigger time\r\n",
-					"year, month, day, hour, minute, second = extract_datetime_attributes(pipeline_trigger_time)\r\n",
 					"\r\n",
 					"# Create empty dictionaries for input datasets and schemas\r\n",
 					"df_dict = {}\r\n",
