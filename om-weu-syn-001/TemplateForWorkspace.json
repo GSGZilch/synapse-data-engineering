@@ -647,7 +647,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "4412b48e-8299-4842-8622-af3ce0c6ec0d"
+						"spark.autotune.trackingId": "f8d46fed-757f-4c5a-81f6-c3dbf1145575"
 					}
 				},
 				"metadata": {
@@ -829,7 +829,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "b63887f1-7696-44e0-8fed-9893bf6958a8"
+						"spark.autotune.trackingId": "0d25d5ef-2b0e-4d85-a062-421e6dda183e"
 					}
 				},
 				"metadata": {
@@ -1522,7 +1522,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "699761b1-02b3-4462-825e-4055ed667d7b"
+						"spark.autotune.trackingId": "352b1f4c-933f-4aeb-a2f5-d3b82c20e160"
 					}
 				},
 				"metadata": {
@@ -1576,7 +1576,7 @@
 							"database_schema = \"SalesLT\""
 						],
 						"outputs": [],
-						"execution_count": 2
+						"execution_count": 31
 					},
 					{
 						"cell_type": "code",
@@ -1585,7 +1585,7 @@
 							"%run utils/pyspark_helper_functions"
 						],
 						"outputs": [],
-						"execution_count": 16
+						"execution_count": 32
 					},
 					{
 						"cell_type": "code",
@@ -1609,7 +1609,7 @@
 							"schema_dict = {}"
 						],
 						"outputs": [],
-						"execution_count": 4
+						"execution_count": 33
 					},
 					{
 						"cell_type": "markdown",
@@ -1657,7 +1657,7 @@
 							"    StructField(\"ModifiedDate\", DateType(), True)]) "
 						],
 						"outputs": [],
-						"execution_count": 5
+						"execution_count": 34
 					},
 					{
 						"cell_type": "markdown",
@@ -1699,7 +1699,7 @@
 							"    StructField(\"ModifiedDate\", DateType(), True)]) "
 						],
 						"outputs": [],
-						"execution_count": 6
+						"execution_count": 35
 					},
 					{
 						"cell_type": "markdown",
@@ -1737,7 +1737,7 @@
 							"    StructField(\"ModifiedDate\", DateType(), True)]) "
 						],
 						"outputs": [],
-						"execution_count": 7
+						"execution_count": 36
 					},
 					{
 						"cell_type": "markdown",
@@ -1781,86 +1781,12 @@
 							"    df_dict[entity] = read_dataframe(\r\n",
 							"        input_path,\r\n",
 							"        header='true',\r\n",
-							"        schema=schema_dict[entity])"
+							"        schema=schema_dict[entity])\r\n",
+							"\r\n",
+							"    df_dict[entity].printSchema()"
 						],
 						"outputs": [],
-						"execution_count": 8
-					},
-					{
-						"cell_type": "markdown",
-						"metadata": {
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							}
-						},
-						"source": [
-							"## Display datasets"
-						]
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"collapsed": false
-						},
-						"source": [
-							"display(df_dict[\"Customer\"].limit(5))\r\n",
-							"df_dict[\"Customer\"].printSchema()"
-						],
-						"outputs": [],
-						"execution_count": 13
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"collapsed": false
-						},
-						"source": [
-							"display(df_dict[\"Address\"].limit(5))\r\n",
-							"df_dict[\"Address\"].printSchema()"
-						],
-						"outputs": [],
-						"execution_count": 14
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"collapsed": false
-						},
-						"source": [
-							"display(df_dict[\"CustomerAddress\"].limit(5))\r\n",
-							"df_dict[\"CustomerAddress\"].printSchema()"
-						],
-						"outputs": [],
-						"execution_count": 15
+						"execution_count": 37
 					},
 					{
 						"cell_type": "markdown",
@@ -1874,6 +1800,27 @@
 						"source": [
 							"## Join datasets"
 						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# Rename ModifiedDate columns to be entity specific\r\n",
+							"df_dict[\"Address\"] = df_dict[\"Address\"].withColumnRenamed(\"ModifiedDate\", \"AddrModifiedDate\")\r\n",
+							"df_dict[\"CustomerAddress\"] = df_dict[\"CustomerAddress\"].withColumnRenamed(\"ModifiedDate\", \"CustAddrModifiedDate\")"
+						],
+						"outputs": [],
+						"execution_count": 38
 					},
 					{
 						"cell_type": "code",
@@ -1904,27 +1851,7 @@
 							"    col2 = \"AddressID\")"
 						],
 						"outputs": [],
-						"execution_count": 17
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"collapsed": false
-						},
-						"source": [
-							"display(output_df.limit(5))"
-						],
-						"outputs": [],
-						"execution_count": 18
+						"execution_count": 39
 					},
 					{
 						"cell_type": "code",
@@ -1940,34 +1867,11 @@
 							}
 						},
 						"source": [
-							"# drop duplicate rowguids\r\n",
-							"output_df = output_df.drop(df_dict[\"Address\"].rowguid).drop(df_dict[\"CustomerAddress\"].rowguid)\r\n",
-							"\r\n",
-							"output_df = output_df\\\r\n",
-							"    .withColumnRenamed(df_dict[\"Address\"].ModifiedDate, \"AddrModifiedDate\")\\\r\n",
-							"    .withColumnRenamed(df_dict[\"CustomerAddress\"].ModifiedDate, \"CustAddrModifiedDate\")"
+							"# Drop duplicate rowguid columns\r\n",
+							"output_df = output_df.drop(df_dict[\"Address\"].rowguid).drop(df_dict[\"CustomerAddress\"].rowguid)"
 						],
 						"outputs": [],
-						"execution_count": null
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							}
-						},
-						"source": [
-							"df_dict[\"Address\"][\"rowguid\"]"
-						],
-						"outputs": [],
-						"execution_count": 20
+						"execution_count": 40
 					},
 					{
 						"cell_type": "markdown",
@@ -1979,7 +1883,7 @@
 							}
 						},
 						"source": [
-							"## Write datasets"
+							"## Write dataset"
 						]
 					},
 					{
@@ -1996,23 +1900,23 @@
 							}
 						},
 						"source": [
-							"for entity in entities:\r\n",
+							"output_path = get_folder_path(\r\n",
+							"    tier='silver',\r\n",
+							"    data_source_id=data_source_id,\r\n",
+							"    database_schema=database_schema,\r\n",
+							"    entity=\"dimCustomer\",\r\n",
+							"    dt=pipeline_trigger_time,\r\n",
+							")\r\n",
 							"\r\n",
-							"    output_path = get_folder_path(\r\n",
-							"        tier='silver',\r\n",
-							"        data_source_id=data_source_id,\r\n",
-							"        database_schema=database_schema,\r\n",
-							"        entity=entity,\r\n",
-							"        dt=pipeline_trigger_time,\r\n",
-							"    )\r\n",
-							"\r\n",
-							"    write_dataframe(\r\n",
-							"        df=df_dict[entity],\r\n",
-							"        path=output_path,\r\n",
-							"        partitions=1)"
+							"write_dataframe(\r\n",
+							"    df=output_df,\r\n",
+							"    path=output_path,\r\n",
+							"    csv=True,\r\n",
+							"    parquet=True,\r\n",
+							"    partitions=1)"
 						],
 						"outputs": [],
-						"execution_count": null
+						"execution_count": 42
 					}
 				]
 			},
