@@ -16,7 +16,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "84f51ce9-2136-4f9e-a544-6c279d5065ed"
+				"spark.autotune.trackingId": "d937c8de-544c-4a48-b1d2-c1c29a9ced30"
 			}
 		},
 		"metadata": {
@@ -157,8 +157,8 @@
 				"source": [
 					"def left_join_dataframes(df1, df2, col1, col2):\r\n",
 					"    # Perform left outer join on dataframes and drop duplicate column\r\n",
-					"    df = df1.join(df2, col1 == col2, \"leftouter\")\r\n",
-					"    df = df.drop(col2)\r\n",
+					"    df = df1.join(df2, df1[col1] == df2[col2], \"leftouter\")\r\n",
+					"    df = df.drop(df2[col2])\r\n",
 					"    return df"
 				],
 				"execution_count": null
