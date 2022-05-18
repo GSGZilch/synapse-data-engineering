@@ -3,7 +3,7 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "10_100 - SalesLT - Ingest SQL Source to Bronze",
+				"name": "01_100 - SalesLT - Ingest SQL Source to Bronze",
 				"type": "ExecutePipeline",
 				"dependsOn": [],
 				"userProperties": [],

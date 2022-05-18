@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "250cf349-cafe-4655-8048-1ecd597c70b4"
+				"spark.autotune.trackingId": "ba70a14a-ec60-4f6e-8ea9-c8bf8c111506"
 			}
 		},
 		"metadata": {
@@ -66,18 +66,18 @@
 				},
 				"source": [
 					"# Parameter cell to define default values for notebook input parameters\r\n",
-					"pipeline_trigger_time = \"2022-01-01 00:00:00\"\r\n",
-					"data_source_id = \"\"\r\n",
-					"database_schema = \"\""
+					"pipeline_trigger_time = \"2022-01-01 12:00:00\"\r\n",
+					"data_source_id = \"01_100\"\r\n",
+					"database_schema = \"SalesLT\""
 				],
-				"execution_count": 25
+				"execution_count": 2
 			},
 			{
 				"cell_type": "code",
 				"source": [
 					"%run utils/pyspark_helper_functions"
 				],
-				"execution_count": 8
+				"execution_count": 12
 			},
 			{
 				"cell_type": "code",
@@ -100,7 +100,7 @@
 					"df_dict = {}\r\n",
 					"schema_dict = {}"
 				],
-				"execution_count": 27
+				"execution_count": 4
 			},
 			{
 				"cell_type": "markdown",
@@ -147,7 +147,7 @@
 					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
 					"    StructField(\"ModifiedDate\", DateType(), True)]) "
 				],
-				"execution_count": 16
+				"execution_count": 5
 			},
 			{
 				"cell_type": "markdown",
@@ -188,7 +188,7 @@
 					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
 					"    StructField(\"ModifiedDate\", DateType(), True)]) "
 				],
-				"execution_count": null
+				"execution_count": 6
 			},
 			{
 				"cell_type": "markdown",
@@ -225,7 +225,7 @@
 					"    StructField(\"rowguid\", StringType(), True),\\\r\n",
 					"    StructField(\"ModifiedDate\", DateType(), True)]) "
 				],
-				"execution_count": null
+				"execution_count": 7
 			},
 			{
 				"cell_type": "markdown",
@@ -271,7 +271,7 @@
 					"        header='true',\r\n",
 					"        schema=schema_dict[entity])"
 				],
-				"execution_count": 17
+				"execution_count": 8
 			},
 			{
 				"cell_type": "markdown",
@@ -283,7 +283,77 @@
 					}
 				},
 				"source": [
-					"## Transform datasets"
+					"## Display datasets"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_dict[\"Customer\"].limit(5))"
+				],
+				"execution_count": 9
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_dict[\"Address\"].limit(5))"
+				],
+				"execution_count": 10
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(df_dict[\"CustomerAddress\"].limit(5))"
+				],
+				"execution_count": 11
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"## Join datasets"
 				]
 			},
 			{
@@ -300,7 +370,7 @@
 					}
 				},
 				"source": [
-					"# join dfs"
+					""
 				],
 				"execution_count": null
 			},
