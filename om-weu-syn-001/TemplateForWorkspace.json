@@ -647,7 +647,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "457cee1e-a69b-4e86-a6a4-ef0c2fb5b536"
+						"spark.autotune.trackingId": "4412b48e-8299-4842-8622-af3ce0c6ec0d"
 					}
 				},
 				"metadata": {
@@ -794,8 +794,8 @@
 						"source": [
 							"def left_join_dataframes(df1, df2, col1, col2):\r\n",
 							"    # Perform left outer join on dataframes and drop duplicate column\r\n",
-							"    df = df1.join(df2, col1 == col2, \"leftouter\")\r\n",
-							"    df = df.drop(col2)\r\n",
+							"    df = df1.join(df2, df1[col1] == df2[col2], \"leftouter\")\r\n",
+							"    df = df.drop(df2[col2])\r\n",
 							"    return df"
 						],
 						"outputs": [],
@@ -829,7 +829,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "c65e4367-34e1-4f36-ad61-2162cecc2562"
+						"spark.autotune.trackingId": "b63887f1-7696-44e0-8fed-9893bf6958a8"
 					}
 				},
 				"metadata": {
@@ -855,7 +855,6 @@
 						"nodeCount": 10,
 						"cores": 4,
 						"memory": 28,
-						"extraHeader": {},
 						"automaticScaleJobs": false
 					},
 					"sessionKeepAliveTimeout": 30
@@ -1523,7 +1522,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "0853d176-c2c8-4d69-a704-e7155dfdba62"
+						"spark.autotune.trackingId": "699761b1-02b3-4462-825e-4055ed667d7b"
 					}
 				},
 				"metadata": {
@@ -1549,7 +1548,6 @@
 						"nodeCount": 10,
 						"cores": 4,
 						"memory": 28,
-						"extraHeader": {},
 						"automaticScaleJobs": false
 					},
 					"sessionKeepAliveTimeout": 30
@@ -1587,7 +1585,7 @@
 							"%run utils/pyspark_helper_functions"
 						],
 						"outputs": [],
-						"execution_count": 12
+						"execution_count": 16
 					},
 					{
 						"cell_type": "code",
@@ -1816,10 +1814,11 @@
 							"collapsed": false
 						},
 						"source": [
-							"display(df_dict[\"Customer\"].limit(5))"
+							"display(df_dict[\"Customer\"].limit(5))\r\n",
+							"df_dict[\"Customer\"].printSchema()"
 						],
 						"outputs": [],
-						"execution_count": 9
+						"execution_count": 13
 					},
 					{
 						"cell_type": "code",
@@ -1836,10 +1835,11 @@
 							"collapsed": false
 						},
 						"source": [
-							"display(df_dict[\"Address\"].limit(5))"
+							"display(df_dict[\"Address\"].limit(5))\r\n",
+							"df_dict[\"Address\"].printSchema()"
 						],
 						"outputs": [],
-						"execution_count": 10
+						"execution_count": 14
 					},
 					{
 						"cell_type": "code",
@@ -1856,10 +1856,11 @@
 							"collapsed": false
 						},
 						"source": [
-							"display(df_dict[\"CustomerAddress\"].limit(5))"
+							"display(df_dict[\"CustomerAddress\"].limit(5))\r\n",
+							"df_dict[\"CustomerAddress\"].printSchema()"
 						],
 						"outputs": [],
-						"execution_count": 11
+						"execution_count": 15
 					},
 					{
 						"cell_type": "markdown",
@@ -1888,10 +1889,85 @@
 							}
 						},
 						"source": [
-							""
+							"# Join Customer and CustomerAddress on CustomerID\r\n",
+							"output_df = left_join_dataframes(\r\n",
+							"    df1 = df_dict[\"Customer\"],\r\n",
+							"    df2 = df_dict[\"CustomerAddress\"],\r\n",
+							"    col1 = \"CustomerID\",\r\n",
+							"    col2 = \"CustomerID\")\r\n",
+							"\r\n",
+							"# Join Address on AddressID\r\n",
+							"output_df = left_join_dataframes(\r\n",
+							"    df1 = output_df,\r\n",
+							"    df2 = df_dict[\"Address\"],\r\n",
+							"    col1 = \"AddressID\",\r\n",
+							"    col2 = \"AddressID\")"
+						],
+						"outputs": [],
+						"execution_count": 17
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(output_df.limit(5))"
+						],
+						"outputs": [],
+						"execution_count": 18
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"# drop duplicate rowguids\r\n",
+							"output_df = output_df.drop(df_dict[\"Address\"].rowguid).drop(df_dict[\"CustomerAddress\"].rowguid)\r\n",
+							"\r\n",
+							"output_df = output_df\\\r\n",
+							"    .withColumnRenamed(df_dict[\"Address\"].ModifiedDate, \"AddrModifiedDate\")\\\r\n",
+							"    .withColumnRenamed(df_dict[\"CustomerAddress\"].ModifiedDate, \"CustAddrModifiedDate\")"
 						],
 						"outputs": [],
 						"execution_count": null
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"df_dict[\"Address\"][\"rowguid\"]"
+						],
+						"outputs": [],
+						"execution_count": 20
 					},
 					{
 						"cell_type": "markdown",
