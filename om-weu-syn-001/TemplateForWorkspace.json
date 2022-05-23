@@ -29,6 +29,15 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('workspaceName'), '/sqlpool001')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/P01 - Data Ingestion')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
@@ -130,6 +139,59 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/pipelines/PL - Transform Customer Data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/P03 - Load to Warehouse')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "01_100 - SalesLT - Load Customer to Warehouse",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL - Load to Warehouse",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"databaseSchema": "SalesLT",
+								"dataSourceID": {
+									"value": "@pipeline().parameters.dataSourceID",
+									"type": "Expression"
+								},
+								"dateAndTimeOfImport": {
+									"value": "@pipeline().parameters.dateAndTimeOfImport",
+									"type": "Expression"
+								},
+								"tableName": "dimCustomer"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"dateAndTimeOfImport": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "_LoadEntity"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/PL - Load to Warehouse')]"
 			]
 		},
 		{
@@ -256,7 +318,8 @@
 												"filePath": {
 													"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
 													"type": "Expression"
-												}
+												},
+												"tier": "bronze"
 											}
 										}
 									]
@@ -293,6 +356,124 @@
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/ds_sqldb_generic')]",
 				"[concat(variables('workspaceId'), '/datasets/ds_adls_synw_csv')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/PL - Load to Warehouse')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Load to Warehouse",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "SqlPoolSink",
+								"preCopyScript": {
+									"value": "TRUNCATE TABLE @{pipeline().parameters.databaseSchema}.@{pipeline().parameters.tableName}",
+									"type": "Expression"
+								},
+								"allowCopyCommand": true,
+								"copyCommandSettings": {},
+								"tableOption": "autoCreate"
+							},
+							"enableStaging": true,
+							"stagingSettings": {
+								"linkedServiceName": {
+									"referenceName": "ls_adls_synw",
+									"type": "LinkedServiceReference"
+								},
+								"path": "staging/"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_adls_synw_csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"folderPath": {
+										"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{pipeline().parameters.tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+										"type": "Expression"
+									},
+									"filePath": {
+										"value": "@{pipeline().parameters.tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
+										"type": "Expression"
+									},
+									"tier": "silver"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_sqlpool_generic",
+								"type": "DatasetReference",
+								"parameters": {
+									"databaseSchema": {
+										"value": "@pipeline().parameters.databaseSchema",
+										"type": "Expression"
+									},
+									"tableName": {
+										"value": "@pipeline().parameters.tableName",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"databaseSchema": {
+						"type": "string"
+					},
+					"dataSourceID": {
+						"type": "string"
+					},
+					"dateAndTimeOfImport": {
+						"type": "string"
+					},
+					"tableName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"queryText": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "P03 - Load to Warehouse"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/ds_adls_synw_csv')]",
+				"[concat(variables('workspaceId'), '/datasets/ds_sqlpool_generic')]",
+				"[concat(variables('workspaceId'), '/linkedServices/ls_adls_synw')]"
 			]
 		},
 		{
@@ -347,6 +528,27 @@
 								"dataSourceID": "01_100"
 							}
 						}
+					},
+					{
+						"name": "P03 - Load to Warehouse",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "P02 - Data Transformation",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "P03 - Load to Warehouse",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
 					}
 				],
 				"policy": {
@@ -357,7 +559,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/pipelines/P01 - Data Ingestion')]",
-				"[concat(variables('workspaceId'), '/pipelines/P02 - Data Transformation')]"
+				"[concat(variables('workspaceId'), '/pipelines/P02 - Data Transformation')]",
+				"[concat(variables('workspaceId'), '/pipelines/P03 - Load to Warehouse')]"
 			]
 		},
 		{
@@ -454,6 +657,9 @@
 					},
 					"filePath": {
 						"type": "string"
+					},
+					"tier": {
+						"type": "string"
 					}
 				},
 				"annotations": [],
@@ -466,7 +672,7 @@
 							"type": "Expression"
 						},
 						"folderPath": {
-							"value": "bronze/@{dataset().folderPath}",
+							"value": "@{dataset().tier}/@{dataset().folderPath}",
 							"type": "Expression"
 						},
 						"fileSystem": "data-platform"
@@ -515,6 +721,41 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/linkedServices/ls_sqldb_datasource001')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ds_sqlpool_generic')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"databaseSchema": {
+						"type": "string"
+					},
+					"tableName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "SqlPoolTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().databaseSchema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().tableName",
+						"type": "Expression"
+					}
+				},
+				"sqlPool": {
+					"referenceName": "sqlpool001",
+					"type": "SqlPoolReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/sqlPools/sqlpool001')]"
 			]
 		},
 		{
@@ -647,7 +888,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "f8d46fed-757f-4c5a-81f6-c3dbf1145575"
+						"spark.autotune.trackingId": "d937c8de-544c-4a48-b1d2-c1c29a9ced30"
 					}
 				},
 				"metadata": {
@@ -687,7 +928,6 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"def read_dataframe(path, file_type=None, header=None, schema=None, verbose=False):    \r\n",
 							"    if file_type is None: file_type = path.split('.')[-1]\r\n",
@@ -829,7 +1069,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "0d25d5ef-2b0e-4d85-a062-421e6dda183e"
+						"spark.autotune.trackingId": "321f96b3-06e0-4097-9844-fb6f1bd78b47"
 					}
 				},
 				"metadata": {
@@ -854,8 +1094,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -1522,7 +1761,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "352b1f4c-933f-4aeb-a2f5-d3b82c20e160"
+						"spark.autotune.trackingId": "e52bd6f0-c080-48fc-aa46-dc727290ee7f"
 					}
 				},
 				"metadata": {
@@ -1547,8 +1786,7 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 10,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
@@ -1580,7 +1818,6 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"%run utils/pyspark_helper_functions"
 						],
@@ -3489,6 +3726,18 @@
 				"sparkVersion": "3.1",
 				"isComputeIsolationEnabled": false,
 				"sessionLevelPackagesEnabled": false,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westeurope"
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/sqlpool001')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
 				"annotations": []
 			},
 			"dependsOn": [],
