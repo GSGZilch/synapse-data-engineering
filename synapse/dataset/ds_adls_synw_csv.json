@@ -11,6 +11,9 @@
 			},
 			"filePath": {
 				"type": "string"
+			},
+			"tier": {
+				"type": "string"
 			}
 		},
 		"annotations": [],
@@ -23,7 +26,7 @@
 					"type": "Expression"
 				},
 				"folderPath": {
-					"value": "bronze/@{dataset().folderPath}",
+					"value": "@{dataset().tier}/@{dataset().folderPath}",
 					"type": "Expression"
 				},
 				"fileSystem": "data-platform"

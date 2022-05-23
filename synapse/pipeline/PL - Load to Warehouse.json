@@ -1,5 +1,5 @@
 {
-	"name": "PL - Ingest SQL Source to Bronze",
+	"name": "PL - Load to Warehouse",
 	"properties": {
 		"activities": [
 			{
@@ -67,9 +67,15 @@
 							"userProperties": [],
 							"typeProperties": {
 								"source": {
-									"type": "AzureSqlSource",
-									"queryTimeout": "02:00:00",
-									"partitionOption": "None"
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
 								},
 								"sink": {
 									"type": "DelimitedTextSink",
@@ -94,17 +100,18 @@
 							},
 							"inputs": [
 								{
-									"referenceName": "ds_sqldb_generic",
+									"referenceName": "ds_adls_synw_csv",
 									"type": "DatasetReference",
 									"parameters": {
-										"tableName": {
-											"value": "@item().tableName",
+										"folderPath": {
+											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{item().tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
 											"type": "Expression"
 										},
-										"databaseSchema": {
-											"value": "@pipeline().parameters.databaseSchema",
+										"filePath": {
+											"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
 											"type": "Expression"
-										}
+										},
+										"tier": "silver"
 									}
 								}
 							],
@@ -121,7 +128,7 @@
 											"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
 											"type": "Expression"
 										},
-										"tier": "bronze"
+										"tier": "dummy"
 									}
 								}
 							]
@@ -147,7 +154,7 @@
 			}
 		},
 		"folder": {
-			"name": "P01 - Data Ingestion"
+			"name": "P03 - Load to Warehouse"
 		},
 		"annotations": []
 	}
