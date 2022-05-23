@@ -48,6 +48,26 @@
 						"dataSourceID": "01_100"
 					}
 				}
+			},
+			{
+				"name": "P03 - Load to Warehouse",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "P02 - Data Transformation",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "P03 - Load to Warehouse",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
 			}
 		],
 		"annotations": []
