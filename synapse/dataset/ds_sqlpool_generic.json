@@ -1,0 +1,30 @@
+{
+	"name": "ds_sqlpool_generic",
+	"properties": {
+		"parameters": {
+			"databaseSchema": {
+				"type": "string"
+			},
+			"tableName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SqlPoolTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().databaseSchema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().tableName",
+				"type": "Expression"
+			}
+		},
+		"sqlPool": {
+			"referenceName": "sqlpool001",
+			"type": "SqlPoolReference"
+		}
+	}
+}

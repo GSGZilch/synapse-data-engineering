@@ -3,8 +3,8 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "Get SQL Table Names",
-				"type": "Lookup",
+				"name": "Load to Warehouse",
+				"type": "Copy",
 				"dependsOn": [],
 				"policy": {
 					"timeout": "7.00:00:00",
@@ -16,125 +16,60 @@
 				"userProperties": [],
 				"typeProperties": {
 					"source": {
-						"type": "AzureSqlSource",
-						"sqlReaderQuery": {
-							"value": "SELECT [name] as tableName, SCHEMA_NAME(schema_id) FROM sys.tables\nWHERE SCHEMA_NAME(schema_id) = '@{pipeline().parameters.databaseSchema}'\nORDER BY 1 DESC;",
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "SqlPoolSink",
+						"preCopyScript": {
+							"value": "TRUNCATE TABLE @{pipeline().parameters.databaseSchema}.@{pipeline().parameters.tableName}",
 							"type": "Expression"
 						},
-						"queryTimeout": "02:00:00",
-						"partitionOption": "None"
+						"allowCopyCommand": true,
+						"tableOption": "autoCreate"
 					},
-					"dataset": {
-						"referenceName": "ds_sqldb_generic",
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_adls_synw_csv",
 						"type": "DatasetReference",
 						"parameters": {
-							"tableName": "placeholder",
-							"databaseSchema": "placeholder"
+							"folderPath": {
+								"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{pipeline().parameters.tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
+								"type": "Expression"
+							},
+							"filePath": {
+								"value": "@{pipeline().parameters.tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
+								"type": "Expression"
+							},
+							"tier": "silver"
 						}
-					},
-					"firstRowOnly": false
-				}
-			},
-			{
-				"name": "Ingest Data for Each Table",
-				"type": "ForEach",
-				"dependsOn": [
-					{
-						"activity": "Get SQL Table Names",
-						"dependencyConditions": [
-							"Succeeded"
-						]
 					}
 				],
-				"userProperties": [],
-				"typeProperties": {
-					"items": {
-						"value": "@activity('Get SQL Table Names').output.value",
-						"type": "Expression"
-					},
-					"activities": [
-						{
-							"name": "Ingest SQL Source to Bronze",
-							"type": "Copy",
-							"dependsOn": [],
-							"policy": {
-								"timeout": "7.00:00:00",
-								"retry": 0,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
-								"secureInput": false
+				"outputs": [
+					{
+						"referenceName": "ds_sqlpool_generic",
+						"type": "DatasetReference",
+						"parameters": {
+							"databaseSchema": {
+								"value": "@pipeline().parameters.databaseSchema",
+								"type": "Expression"
 							},
-							"userProperties": [],
-							"typeProperties": {
-								"source": {
-									"type": "DelimitedTextSource",
-									"storeSettings": {
-										"type": "AzureBlobFSReadSettings",
-										"recursive": true,
-										"enablePartitionDiscovery": false
-									},
-									"formatSettings": {
-										"type": "DelimitedTextReadSettings"
-									}
-								},
-								"sink": {
-									"type": "DelimitedTextSink",
-									"storeSettings": {
-										"type": "AzureBlobFSWriteSettings"
-									},
-									"formatSettings": {
-										"type": "DelimitedTextWriteSettings",
-										"quoteAllText": true,
-										"fileExtension": ".txt"
-									}
-								},
-								"enableStaging": false,
-								"translator": {
-									"type": "TabularTranslator",
-									"typeConversion": true,
-									"typeConversionSettings": {
-										"allowDataTruncation": true,
-										"treatBooleanAsNumber": false
-									}
-								}
-							},
-							"inputs": [
-								{
-									"referenceName": "ds_adls_synw_csv",
-									"type": "DatasetReference",
-									"parameters": {
-										"folderPath": {
-											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{item().tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
-											"type": "Expression"
-										},
-										"filePath": {
-											"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
-											"type": "Expression"
-										},
-										"tier": "silver"
-									}
-								}
-							],
-							"outputs": [
-								{
-									"referenceName": "ds_adls_synw_csv",
-									"type": "DatasetReference",
-									"parameters": {
-										"folderPath": {
-											"value": "@{pipeline().parameters.dataSourceID}/@{pipeline().parameters.databaseSchema}/@{item().tableName}/@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyy/MM/dd')}",
-											"type": "Expression"
-										},
-										"filePath": {
-											"value": "@{item().tableName}_@{formatDateTime(pipeline().parameters.dateAndTimeOfImport, 'yyyyMMdd-hhmmss')}.csv",
-											"type": "Expression"
-										},
-										"tier": "dummy"
-									}
-								}
-							]
+							"tableName": {
+								"value": "@pipeline().parameters.tableName",
+								"type": "Expression"
+							}
 						}
-					]
-				}
+					}
+				]
 			}
 		],
 		"parameters": {
@@ -145,6 +80,9 @@
 				"type": "string"
 			},
 			"dateAndTimeOfImport": {
+				"type": "string"
+			},
+			"tableName": {
 				"type": "string"
 			}
 		},

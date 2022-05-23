@@ -1,0 +1,44 @@
+{
+	"name": "P03 - Load to Warehouse",
+	"properties": {
+		"activities": [
+			{
+				"name": "01_100 - SalesLT - Load Customer to Warehouse",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL - Load to Warehouse",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"databaseSchema": "SalesLT",
+						"dataSourceID": {
+							"value": "@pipeline().parameters.dataSourceID",
+							"type": "Expression"
+						},
+						"dateAndTimeOfImport": {
+							"value": "@pipeline().parameters.dateAndTimeOfImport",
+							"type": "Expression"
+						},
+						"tableName": "dimCustomer"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"dateAndTimeOfImport": {
+				"type": "string"
+			},
+			"dataSourceID": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "_LoadEntity"
+		},
+		"annotations": []
+	}
+}
