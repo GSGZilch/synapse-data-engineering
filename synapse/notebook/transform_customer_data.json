@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "e52bd6f0-c080-48fc-aa46-dc727290ee7f"
+				"spark.autotune.trackingId": "1bb15dd0-a27b-4047-8af7-5ebfaa1969ec"
 			}
 		},
 		"metadata": {
@@ -324,17 +324,17 @@
 				"source": [
 					"# Join Customer and CustomerAddress on CustomerID\r\n",
 					"output_df = left_join_dataframes(\r\n",
-					"    df1 = df_dict[\"Customer\"],\r\n",
-					"    df2 = df_dict[\"CustomerAddress\"],\r\n",
-					"    col1 = \"CustomerID\",\r\n",
-					"    col2 = \"CustomerID\")\r\n",
+					"    df_left = df_dict[\"Customer\"],\r\n",
+					"    df_right = df_dict[\"CustomerAddress\"],\r\n",
+					"    col_left = \"CustomerID\",\r\n",
+					"    col_right = \"CustomerID\")\r\n",
 					"\r\n",
 					"# Join Address on AddressID\r\n",
 					"output_df = left_join_dataframes(\r\n",
-					"    df1 = output_df,\r\n",
-					"    df2 = df_dict[\"Address\"],\r\n",
-					"    col1 = \"AddressID\",\r\n",
-					"    col2 = \"AddressID\")"
+					"    df_left = output_df,\r\n",
+					"    df_right = df_dict[\"Address\"],\r\n",
+					"    col_left = \"AddressID\",\r\n",
+					"    col_right = \"AddressID\")"
 				],
 				"execution_count": 39
 			},
